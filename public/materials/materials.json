@@ -1,0 +1,194 @@
+[
+  {
+    "id": 0,
+    "name": "金属",
+    "color": "#D4D4D4",
+    "roughness": 0.1,
+    "metallic": 1,
+    "imagePath": "/materials/material-0.png"
+  },
+  {
+    "id": 1,
+    "name": "金",
+    "color": "#FFD700",
+    "roughness": 0.1,
+    "metallic": 1,
+    "imagePath": "/materials/material-1.png"
+  },
+  {
+    "id": 2,
+    "name": "银",
+    "color": "#C0C0C0",
+    "roughness": 0.1,
+    "metallic": 1,
+    "imagePath": "/materials/material-2.png"
+  },
+  {
+    "id": 3,
+    "name": "铜",
+    "color": "#B87333",
+    "roughness": 0.2,
+    "metallic": 1,
+    "imagePath": "/materials/material-3.png"
+  },
+  {
+    "id": 4,
+    "name": "铬",
+    "color": "#E8E8E8",
+    "roughness": 0.05,
+    "metallic": 1,
+    "imagePath": "/materials/material-4.png"
+  },
+  {
+    "id": 5,
+    "name": "塑料红",
+    "color": "#FF5252",
+    "roughness": 0.7,
+    "metallic": 0,
+    "imagePath": "/materials/material-5.png"
+  },
+  {
+    "id": 6,
+    "name": "塑料蓝",
+    "color": "#4285F4",
+    "roughness": 0.7,
+    "metallic": 0,
+    "imagePath": "/materials/material-6.png"
+  },
+  {
+    "id": 7,
+    "name": "塑料绿",
+    "color": "#0F9D58",
+    "roughness": 0.7,
+    "metallic": 0,
+    "imagePath": "/materials/material-7.png"
+  },
+  {
+    "id": 8,
+    "name": "塑料黄",
+    "color": "#FFEB3B",
+    "roughness": 0.7,
+    "metallic": 0,
+    "imagePath": "/materials/material-8.png"
+  },
+  {
+    "id": 9,
+    "name": "塑料黑",
+    "color": "#212121",
+    "roughness": 0.7,
+    "metallic": 0,
+    "imagePath": "/materials/material-9.png"
+  },
+  {
+    "id": 10,
+    "name": "塑料白",
+    "color": "#FFFFFF",
+    "roughness": 0.7,
+    "metallic": 0,
+    "imagePath": "/materials/material-10.png"
+  },
+  {
+    "id": 11,
+    "name": "玻璃",
+    "color": "#E0F7FA",
+    "roughness": 0,
+    "metallic": 0,
+    "imagePath": "/materials/material-11.png"
+  },
+  {
+    "id": 12,
+    "name": "橡胶",
+    "color": "#424242",
+    "roughness": 1,
+    "metallic": 0,
+    "imagePath": "/materials/material-12.png"
+  },
+  {
+    "id": 13,
+    "name": "木材",
+    "color": "#8D6E63",
+    "roughness": 0.9,
+    "metallic": 0,
+    "imagePath": "/materials/material-13.png"
+  },
+  {
+    "id": 14,
+    "name": "大理石",
+    "color": "#E0E0E0",
+    "roughness": 0.3,
+    "metallic": 0,
+    "imagePath": "/materials/material-14.png"
+  },
+  {
+    "id": 15,
+    "name": "陶瓷",
+    "color": "#F5F5F5",
+    "roughness": 0.5,
+    "metallic": 0,
+    "imagePath": "/materials/material-15.png"
+  },
+  {
+    "id": 16,
+    "name": "皮革",
+    "color": "#795548",
+    "roughness": 0.8,
+    "metallic": 0,
+    "imagePath": "/materials/material-16.png"
+  },
+  {
+    "id": 17,
+    "name": "布料",
+    "color": "#9E9E9E",
+    "roughness": 1,
+    "metallic": 0,
+    "imagePath": "/materials/material-17.png"
+  },
+  {
+    "id": 18,
+    "name": "霓虹红",
+    "color": "#FF1744",
+    "roughness": 0.3,
+    "metallic": 0.5,
+    "imagePath": "/materials/material-18.png"
+  },
+  {
+    "id": 19,
+    "name": "霓虹蓝",
+    "color": "#2979FF",
+    "roughness": 0.3,
+    "metallic": 0.5,
+    "imagePath": "/materials/material-19.png"
+  },
+  {
+    "id": 20,
+    "name": "霓虹绿",
+    "color": "#00E676",
+    "roughness": 0.3,
+    "metallic": 0.5,
+    "imagePath": "/materials/material-20.png"
+  },
+  {
+    "id": 21,
+    "name": "霓虹紫",
+    "color": "#D500F9",
+    "roughness": 0.3,
+    "metallic": 0.5,
+    "imagePath": "/materials/material-21.png"
+  },
+  {
+    "id": 22,
+    "name": "珍珠",
+    "color": "#F5F5F5",
+    "roughness": 0.2,
+    "metallic": 0.8,
+    "imagePath": "/materials/material-22.png"
+  },
+  {
+    "id": 23,
+    "name": "锈金属",
+    "color": "#8D6E63",
+    "roughness": 0.7,
+    "metallic": 0.8,
+    "imagePath": "/materials/material-23.png"
+  }
+]

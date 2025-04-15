@@ -1,0 +1,6 @@
+{
+  "name": "handle-model-upload",
+  "version": "1.0.0",
+  "description": "当Supabase存储桶中有新的模型文件时，自动添加到数据表中",
+  "verify_jwt": true
+}

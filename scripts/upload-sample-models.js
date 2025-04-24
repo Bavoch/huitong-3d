@@ -23,19 +23,27 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // 创建 Supabase 客户端
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// 示例模型 URL
+// 示例模型 URL - 使用 GLB 格式，更适合 Web 使用
 const sampleModels = [
   {
-    url: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF/Duck.gltf',
-    name: 'duck.gltf'
+    url: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF-Binary/Duck.glb',
+    name: 'duck.glb',
+    description: '示例鸭子模型'
   },
   {
-    url: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Box/glTF/Box.gltf',
-    name: 'box.gltf'
+    url: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Box/glTF-Binary/Box.glb',
+    name: 'box.glb',
+    description: '示例盒子模型'
   },
   {
-    url: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Avocado/glTF/Avocado.gltf',
-    name: 'avocado.gltf'
+    url: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Avocado/glTF-Binary/Avocado.glb',
+    name: 'avocado.glb',
+    description: '示例牛油果模型'
+  },
+  {
+    url: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb',
+    name: 'damaged_helmet.glb',
+    description: '示例损坏头盔模型'
   }
 ];
 
@@ -66,30 +74,14 @@ async function uploadToSupabase(filePath, fileName) {
   try {
     const fileBuffer = fs.readFileSync(filePath);
 
-    // 检查存储桶是否存在，如果不存在则创建
-    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
-
-    if (bucketsError) {
-      throw new Error(`获取存储桶列表失败: ${bucketsError.message}`);
-    }
-
-    const modelsBucket = buckets.find(bucket => bucket.name === 'models');
-    if (!modelsBucket) {
-      console.log('创建 models 存储桶...');
-      const { error: createError } = await supabase.storage.createBucket('models', {
-        public: true
-      });
-
-      if (createError) {
-        throw new Error(`创建存储桶失败: ${createError.message}`);
-      }
-    }
+    // 我们假设存储桶已经存在，直接上传文件
+    console.log('使用现有的 models 存储桶...');
 
     // 上传文件
     const { data, error } = await supabase.storage
       .from('models')
       .upload(fileName, fileBuffer, {
-        contentType: 'model/gltf+json',
+        contentType: fileName.endsWith('.glb') ? 'model/gltf-binary' : 'model/gltf+json',
         upsert: true
       });
 
@@ -160,7 +152,7 @@ async function main() {
     if (!publicUrl) continue;
 
     // 创建模型记录
-    await createModelRecord(model.name, publicUrl);
+    await createModelRecord(model.name, publicUrl, model.description);
 
     // 删除临时文件
     fs.unlinkSync(filePath);

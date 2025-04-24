@@ -6,28 +6,18 @@ import { type Model } from '../lib/supabase';
 
 // 简单的加载指示器组件
 function LoadingIndicator() {
-  const [rotation, setRotation] = useState(0);
-
-  // 创建旋转动画
-  useFrame(() => {
-    setRotation(prev => prev + 0.05);
-  });
-
   return (
     <group>
       {/* 加载中文字 */}
-      <mesh position={[0, 0, 0]}>
-        <planeGeometry args={[3, 0.5]} />
-        <meshBasicMaterial transparent opacity={0} />
-        <Html center position={[0, 0, 0]}>
-          <div className="bg-white/80 px-4 py-2 rounded-md shadow-md">
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              <span className="text-gray-800 font-medium">加载中...</span>
-            </div>
+      <Html position={[0, 0, 0]} center>
+        <div className="bg-black/70 text-white px-6 py-4 rounded-md text-center">
+          <div className="flex items-center justify-center space-x-2 mb-2">
+            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <span className="text-white font-medium text-lg">加载中...</span>
           </div>
-        </Html>
-      </mesh>
+          <div className="text-gray-300">请稍候</div>
+        </div>
+      </Html>
     </group>
   );
 }
@@ -52,43 +42,13 @@ function DefaultModel({
   customRoughness: number;
   customMetallic: number;
 }) {
-  const material = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(customColor),
-    roughness: customRoughness,
-    metalness: customMetallic,
-  });
-
-  const errorMaterial = new THREE.MeshStandardMaterial({
-    color: new THREE.Color("#ff4444"),
-    roughness: 0.3,
-    metalness: 0.7,
-  });
-
   return (
     <group>
-      {/* 底座 */}
-      <mesh position={[0, -0.7, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[1.2, 1.2, 0.2, 32]} />
-        <primitive object={material} attach="material" />
-      </mesh>
-
-      {/* 主体 */}
-      <mesh position={[0, 0, 0]} castShadow receiveShadow>
-        <boxGeometry args={[1, 1, 1]} />
-        <primitive object={material} attach="material" />
-      </mesh>
-
-      {/* 顶部装饰 - 使用红色表示错误 */}
-      <mesh position={[0, 0.8, 0]} castShadow receiveShadow>
-        <sphereGeometry args={[0.3, 16, 16]} />
-        <primitive object={errorMaterial} attach="material" />
-      </mesh>
-
-      {/* 错误提示文字 */}
-      <Html position={[0, -1.5, 0]} center>
-        <div className="bg-black/70 text-white px-3 py-2 rounded-md text-center">
-          <div className="text-red-400 font-bold">模型加载失败</div>
-          <div className="text-xs text-gray-300 mt-1">请检查模型文件或网络连接</div>
+      {/* 简单的文字提示 */}
+      <Html position={[0, 0, 0]} center>
+        <div className="bg-black/70 text-white px-6 py-4 rounded-md text-center">
+          <div className="text-white font-medium text-lg">模型加载中...</div>
+          <div className="text-gray-300 mt-2">请稍候或选择其他模型</div>
         </div>
       </Html>
     </group>
@@ -110,6 +70,7 @@ function ModelLoader({
   const [error, setError] = useState<string | null>(null);
   const [useDefaultModel, setUseDefaultModel] = useState(false);
   const groupRef = useRef<THREE.Group>(null);
+  const [modelKey, setModelKey] = useState<string>(''); // 用于强制重新渲染模型
 
   // 尝试加载模型
   useEffect(() => {
@@ -125,6 +86,9 @@ function ModelLoader({
     // 重置状态
     setUseDefaultModel(false);
     setError(null);
+
+    // 生成新的模型键，强制重新渲染
+    setModelKey(modelPath + '_' + Date.now());
 
     // 检查模型路径是否为Blob URL（上传的文件）
     if (modelPath.startsWith('blob:')) {
@@ -187,6 +151,7 @@ function ModelLoader({
   return (
     <group ref={groupRef}>
       <ModelObject
+        key={modelKey} // 使用key强制重新渲染
         modelPath={modelPath}
         customColor={customColor}
         customRoughness={customRoughness}
@@ -213,10 +178,28 @@ function ModelObject({
 }) {
   const [modelScene, setModelScene] = useState<THREE.Group | null>(null);
   const [loadError, setLoadError] = useState<boolean>(false);
+  const [currentModelPath, setCurrentModelPath] = useState<string>('');
 
   // 使用useEffect来处理模型加载和错误
   useEffect(() => {
     let isMounted = true;
+
+    // 如果模型路径发生变化，清除当前模型场景
+    if (currentModelPath !== modelPath) {
+      console.log('模型路径已变更，清除当前模型场景');
+      setModelScene(null);
+      setCurrentModelPath(modelPath);
+
+      // 从缓存中移除之前的模型
+      if (currentModelPath) {
+        try {
+          useGLTF.dispose(currentModelPath);
+          console.log('已从缓存中移除之前的模型:', currentModelPath);
+        } catch (e) {
+          console.warn('移除模型缓存失败:', e);
+        }
+      }
+    }
 
     const loadModel = async () => {
       console.log('开始加载模型:', modelPath);
@@ -229,6 +212,13 @@ function ModelObject({
         // 检查模型路径是否为GLB格式
         const isGlb = modelPath.toLowerCase().endsWith('.glb');
         console.log('模型格式:', isGlb ? 'GLB' : 'GLTF');
+
+        // 清除之前的缓存
+        try {
+          useGLTF.dispose(modelPath);
+        } catch (e) {
+          console.warn('清除缓存失败，可能是首次加载此模型');
+        }
 
         // 预加载模型，确保它能被正确加载
         // 使用draco压缩的模型需要特殊处理
@@ -298,10 +288,17 @@ function ModelObject({
     return () => {
       isMounted = false;
     };
-  }, [modelPath, customColor, customRoughness, customMetallic, onError]);
+  }, [modelPath, customColor, customRoughness, customMetallic, onError, currentModelPath]);
 
   if (loadError) {
-    return null;
+    return (
+      <Html position={[0, 0, 0]} center>
+        <div className="bg-black/70 text-white px-6 py-4 rounded-md text-center">
+          <div className="text-white font-medium text-lg">模型加载失败</div>
+          <div className="text-gray-300 mt-2">请选择其他模型</div>
+        </div>
+      </Html>
+    );
   }
 
   return modelScene ? <primitive object={modelScene} /> : <LoadingIndicator />;
@@ -334,6 +331,7 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
   customMetallic
 }) => {
   console.log('渲染ModelViewer组件，选中的模型:', selectedModel);
+  const [modelViewKey, setModelViewKey] = useState<string>('');
 
   // 添加更多调试信息
   useEffect(() => {
@@ -348,6 +346,9 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
         const url = new URL(selectedModel.file_path);
         console.log('文件URL有效:', url.toString());
         console.log('文件扩展名:', url.pathname.split('.').pop()?.toLowerCase());
+
+        // 生成新的key，强制重新渲染
+        setModelViewKey(`model_${selectedModel.id}_${Date.now()}`);
       } catch (e) {
         console.error('文件路径无效:', selectedModel.file_path, e);
       }
@@ -359,6 +360,7 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
   return (
     <div className="w-full h-full">
       <Canvas
+        key={`canvas_${modelViewKey}`} // 使用key强制重新创建Canvas
         camera={{ position: [0, 0, 5], fov: 50 }}
         style={{ background: 'transparent' }}
         gl={{ antialias: true }}
@@ -368,6 +370,7 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
         <Suspense fallback={<LoadingIndicator />}>
           {selectedModel ? (
             <ModelLoader
+              key={`loader_${selectedModel.id}`} // 使用模型ID作为key
               modelPath={selectedModel.file_path}
               customColor={customColor}
               customRoughness={customRoughness}

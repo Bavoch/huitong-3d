@@ -7,7 +7,7 @@ import {
   ShirtIcon,
   UploadIcon,
 } from "lucide-react";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
@@ -401,6 +401,11 @@ export const Screen = (): JSX.Element => {
     fetchModels();
   }, []);
 
+  // 面板宽度状态
+  const [sidebarWidth, setSidebarWidth] = useState<number>(220);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const mainContentRef = useRef<HTMLDivElement>(null);
+
   // 材质数据状态
   const [materials, setMaterials] = useState<Array<{
     id: number;
@@ -418,6 +423,125 @@ export const Screen = (): JSX.Element => {
     materialId: number;
   }>>([]);
   const [selectedModelMaterialIndex, setSelectedModelMaterialIndex] = useState<number>(0);
+
+  // 处理分隔线上的鼠标按下事件
+  const handleDividerMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    console.log('开始拖拽 - 鼠标按下事件触发');
+    e.stopPropagation(); // 阻止事件冒泡
+
+    // 防止文本选择
+    document.body.style.userSelect = 'none';
+    // 添加拖拽时的全局样式
+    document.body.style.cursor = 'col-resize';
+
+    // 开始拖拽 - 设置状态会触发useEffect添加事件监听器
+    setIsDragging(true);
+    console.log('isDragging 设置为 true');
+
+    // 防止默认拖拽行为
+    e.preventDefault();
+  }, []);
+
+  // 处理拖拽移动
+  const handleDragMove = useCallback((e: MouseEvent) => {
+    console.log('拖拽移动事件触发', '当前isDragging状态:', isDragging);
+
+    // 如果不在拖拽状态或没有引用到主内容区域，则返回
+    if (!isDragging) {
+      console.log('未处于拖拽状态，忽略移动事件');
+      return;
+    }
+
+    if (!mainContentRef.current) {
+      console.log('mainContentRef不存在，忽略移动事件');
+      return;
+    }
+
+    // 获取容器尺寸和鼠标位置
+    const containerRect = mainContentRef.current.getBoundingClientRect();
+    const containerWidth = containerRect.width;
+    const mouseX = e.clientX - containerRect.left;
+
+    console.log('鼠标位置:', mouseX, '容器宽度:', containerWidth);
+
+    // 计算新的侧边栏宽度，确保在合理范围内
+    let newWidth = containerWidth - mouseX;
+
+    // 设置最小和最大宽度限制
+    const minWidth = 180;
+    const maxWidth = Math.min(400, containerWidth * 0.5);
+
+    newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+
+    console.log('计算的新宽度:', newWidth, '当前宽度:', sidebarWidth);
+
+    // 直接设置宽度
+    setSidebarWidth(newWidth);
+    console.log('已设置新宽度');
+  }, [isDragging, sidebarWidth]);
+
+  // 处理拖拽结束
+  const handleDragEnd = useCallback(() => {
+    console.log('拖拽结束事件触发', '当前isDragging状态:', isDragging);
+
+    // 恢复样式
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+    console.log('已恢复样式');
+
+    // 设置拖拽状态为false - 会触发useEffect移除事件监听器
+    setIsDragging(false);
+    console.log('isDragging 设置为 false');
+  }, [isDragging]);
+
+  // 全局事件处理器，确保在任何情况下都能正确清理
+  useEffect(() => {
+    // 添加全局鼠标抬起事件处理器，作为安全措施
+    const handleGlobalMouseUp = () => {
+      if (isDragging) {
+        console.log('全局鼠标抬起事件触发，强制结束拖拽');
+        handleDragEnd();
+      }
+    };
+
+    // 添加全局按键事件处理器，按ESC键结束拖拽
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isDragging) {
+        console.log('ESC键按下，强制结束拖拽');
+        handleDragEnd();
+      }
+    };
+
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousemove', handleDragMove);
+      document.removeEventListener('mouseup', handleDragEnd);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, [isDragging, handleDragEnd, handleDragMove]);
+
+  // 监听isDragging状态变化
+  useEffect(() => {
+    console.log('isDragging状态变化:', isDragging);
+
+    if (isDragging) {
+      console.log('进入拖拽状态，添加事件监听器');
+      document.addEventListener('mousemove', handleDragMove);
+      document.addEventListener('mouseup', handleDragEnd);
+
+      // 清理函数，组件卸载或依赖项变化时执行
+      return () => {
+        console.log('清理事件监听器');
+        document.removeEventListener('mousemove', handleDragMove);
+        document.removeEventListener('mouseup', handleDragEnd);
+      };
+    }
+  }, [isDragging, handleDragMove, handleDragEnd]);
 
   // 加载材质数据
   useEffect(() => {
@@ -500,7 +624,7 @@ export const Screen = (): JSX.Element => {
       </header>
 
       {/* Main content area */}
-      <div className="flex items-start gap-5 relative flex-1 self-stretch w-full grow">
+      <div ref={mainContentRef} className="flex items-start relative flex-1 self-stretch w-full grow">
         {/* 3D Preview Area */}
         <Card className="relative flex-1 self-stretch grow bg-[#ffffff0d] rounded-2xl overflow-hidden border-0">
           <CardContent className="p-0 h-full relative">
@@ -529,8 +653,34 @@ export const Screen = (): JSX.Element => {
           </CardContent>
         </Card>
 
+        {/* 可拖拽分隔线区域 */}
+        <div
+          className="relative w-5 mx-0 self-stretch cursor-col-resize group bg-[#ffffff0d] hover:bg-[#ffffff1a]"
+          onMouseDown={handleDividerMouseDown}
+          title="拖拽调整宽度"
+          id="divider-handle"
+        >
+          {/* 实际的分隔线 */}
+          <div
+            className={`absolute left-1/2 transform -translate-x-1/2 w-[2px] h-full ${
+              isDragging ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'bg-blue-500'
+            }`}
+          ></div>
+
+          {/* 拖拽指示器 */}
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+              <polyline points="12 5 5 12 12 19"></polyline>
+            </svg>
+          </div>
+        </div>
+
         {/* Sidebar */}
-        <Card className="flex flex-col w-[220px] items-start gap-4 p-3 relative self-stretch bg-[#ffffff0d] rounded-2xl border-0">
+        <Card
+          className="flex flex-col items-start gap-4 p-3 relative self-stretch bg-[#ffffff0d] rounded-2xl border-0"
+          style={{ width: `${sidebarWidth}px` }}>
           <CardContent className="p-0 space-y-4 w-full">
             {/* Model Selection Section */}
             <div className="flex flex-col items-start gap-2 relative self-stretch w-full">
@@ -559,12 +709,16 @@ export const Screen = (): JSX.Element => {
                         className={`flex items-center justify-between p-2 my-1 rounded-lg cursor-pointer transition-colors duration-150 ${selectedModel === model.id ? 'bg-[#2268eb] text-white' : 'bg-[#2a2a2a] text-[#ffffffe6] hover:bg-[#3a3a3a]'}`}
                         onClick={() => {
                           console.log('选择模型:', model);
-                          setSelectedModel(model.id);
-                          setCurrentModel(model);
-                          // 强制重新渲染
+                          // 先清除当前模型，然后设置新模型，确保状态更新
+                          setCurrentModel(null);
+                          setSelectedModel('');
+
+                          // 使用setTimeout确保状态更新后再设置新模型
                           setTimeout(() => {
+                            setSelectedModel(model.id);
+                            setCurrentModel(model);
                             console.log('当前选中的模型:', model);
-                          }, 0);
+                          }, 50);
                         }}
                       >
                         <div className="flex items-center gap-2 overflow-hidden">
@@ -611,21 +765,21 @@ export const Screen = (): JSX.Element => {
                 className="hidden"
                 onChange={handleFileUpload}
               />
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="ghost"
-                  className="h-8 flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
+                  className="h-8 flex-1 min-w-[80px] flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <UploadIcon className="w-4 h-4 text-[#ffffffb2]" />
-                  <span className="text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal">
+                  <span className="text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal truncate">
                     上传模型
                   </span>
                 </Button>
 
                 <Button
                   variant="ghost"
-                  className="h-8 flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
+                  className="h-8 flex-1 min-w-[80px] flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
                   onClick={fetchModels}
                   disabled={loading}
                 >
@@ -635,14 +789,14 @@ export const Screen = (): JSX.Element => {
                     <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
                     <path d="M16 21h5v-5"></path>
                   </svg>
-                  <span className="text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal">
+                  <span className="text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal truncate">
                     刷新模型
                   </span>
                 </Button>
 
                 <Button
                   variant="ghost"
-                  className="h-8 flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
+                  className="h-8 flex-1 min-w-[80px] flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
                   onClick={async () => {
                     try {
                       // 获取存储桶中的文件
@@ -740,29 +894,29 @@ export const Screen = (): JSX.Element => {
                     <polyline points="17 8 12 3 7 8"></polyline>
                     <line x1="12" y1="3" x2="12" y2="15"></line>
                   </svg>
-                  <span className="text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal">
+                  <span className="text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal truncate">
                     同步模型
                   </span>
                 </Button>
               </div>
               {uploadedModels.length > 0 && (
-                <div className="flex gap-2 mt-2">
+                <div className="flex gap-2 mt-2 w-full">
                   <Button
                     variant="ghost"
-                    className="h-8 flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
+                    className="h-8 flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
                     onClick={() => setShowUploadedModels(true)}
                   >
-                    <span className={`text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal ${showUploadedModels ? 'text-[#2268eb]' : ''}`}>
+                    <span className={`text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal truncate ${showUploadedModels ? 'text-[#2268eb]' : ''}`}>
                       上传模型
                     </span>
                   </Button>
 
                   <Button
                     variant="ghost"
-                    className="h-8 flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
+                    className="h-8 flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
                     onClick={() => setShowUploadedModels(false)}
                   >
-                    <span className={`text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal ${!showUploadedModels ? 'text-[#2268eb]' : ''}`}>
+                    <span className={`text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal truncate ${!showUploadedModels ? 'text-[#2268eb]' : ''}`}>
                       内置模型
                     </span>
                   </Button>
@@ -772,10 +926,10 @@ export const Screen = (): JSX.Element => {
               {uploadedModels.length > 0 && (
                 <Button
                   variant="ghost"
-                  className="h-8 w-full flex items-center justify-center gap-1 px-3 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33] mt-2"
+                  className="h-8 w-full flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33] mt-2"
                   onClick={clearUploadedModels}
                 >
-                  <span className="text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal">
+                  <span className="text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal truncate">
                     清除所有上传模型
                   </span>
                 </Button>
@@ -851,11 +1005,11 @@ export const Screen = (): JSX.Element => {
                     </div>
 
                     {/* Material Grid */}
-                    <div className="flex flex-wrap w-[196px] items-start gap-[8px] relative flex-1 grow overflow-hidden">
+                    <div className="flex flex-wrap w-full items-start gap-[8px] relative flex-1 grow overflow-hidden">
                       {materials.map((material) => (
                         <div
                           key={material.id}
-                          className={`flex w-[60px] h-[60px] items-center gap-1 p-2.5 relative bg-[#ffffff0d] rounded-lg ${material.id === selectedMaterialId ? "border border-solid border-[#2268eb]" : ""}`}
+                          className={`flex w-[calc(33.33%-6px)] h-[60px] items-center gap-1 p-2.5 relative bg-[#ffffff0d] rounded-lg ${material.id === selectedMaterialId ? "border border-solid border-[#2268eb]" : ""}`}
                           onClick={() => {
                             // 选中这个材质
                             setSelectedMaterialId(material.id);

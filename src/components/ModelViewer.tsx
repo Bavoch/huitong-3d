@@ -135,21 +135,20 @@ function ModelLoader({
         const url = new URL(modelPath);
         console.log('模型URL有效:', url.toString());
 
-        // 测试URL是否可访问
-        fetch(modelPath, { method: 'HEAD' })
-          .then(response => {
-            if (!response.ok) {
-              console.error('模型URL无法访问:', response.status, response.statusText);
-              setError(`模型URL无法访问: ${response.status} ${response.statusText}`);
-              setUseDefaultModel(true);
-            } else {
-              console.log('模型URL可以访问');
-            }
-          })
-          .catch(err => {
-            console.error('检查模型URL时出错:', err);
-            // 不要立即设置为使用默认模型，让加载器尝试加载
-          });
+        // 检查文件扩展名
+        const fileExtension = url.pathname.split('.').pop()?.toLowerCase();
+        console.log('文件扩展名:', fileExtension);
+
+        if (!['glb', 'gltf'].includes(fileExtension || '')) {
+          console.error('不支持的文件格式:', fileExtension);
+          setError(`不支持的文件格式: ${fileExtension}`);
+          setUseDefaultModel(true);
+          return;
+        }
+
+        // 不再使用HEAD请求检查URL可访问性，因为某些CDN可能不支持
+        // 直接让Three.js的加载器尝试加载模型
+        console.log('将尝试直接加载模型:', url.toString());
       } catch (e) {
         console.error('模型路径无效:', modelPath, e);
         setUseDefaultModel(true);
@@ -222,23 +221,7 @@ function ModelObject({
     const loadModel = async () => {
       console.log('开始加载模型:', modelPath);
 
-      // 先检查URL是否可访问
-      try {
-        const response = await fetch(modelPath, { method: 'HEAD' });
-        if (!response.ok) {
-          console.error(`模型URL无法访问: ${response.status} ${response.statusText}`);
-          if (isMounted) {
-            setLoadError(true);
-            onError();
-          }
-          return;
-        }
-        console.log('模型URL可以访问，开始加载3D模型');
-      } catch (fetchError) {
-        console.error('检查模型URL时出错:', fetchError);
-        // 继续尝试加载，可能是CORS问题
-      }
-
+      // 跳过HEAD请求检查，直接尝试加载模型
       try {
         // 使用useGLTF钩子加载模型
         console.log('调用useGLTF加载模型:', modelPath);
@@ -246,6 +229,10 @@ function ModelObject({
         // 检查模型路径是否为GLB格式
         const isGlb = modelPath.toLowerCase().endsWith('.glb');
         console.log('模型格式:', isGlb ? 'GLB' : 'GLTF');
+
+        // 预加载模型，确保它能被正确加载
+        // 使用draco压缩的模型需要特殊处理
+        useGLTF.preload(modelPath);
 
         // 加载模型
         const gltf = await useGLTF(modelPath);
@@ -348,6 +335,27 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
 }) => {
   console.log('渲染ModelViewer组件，选中的模型:', selectedModel);
 
+  // 添加更多调试信息
+  useEffect(() => {
+    if (selectedModel) {
+      console.log('ModelViewer - 当前模型详情:');
+      console.log('ID:', selectedModel.id);
+      console.log('名称:', selectedModel.name);
+      console.log('文件路径:', selectedModel.file_path);
+
+      // 验证文件路径
+      try {
+        const url = new URL(selectedModel.file_path);
+        console.log('文件URL有效:', url.toString());
+        console.log('文件扩展名:', url.pathname.split('.').pop()?.toLowerCase());
+      } catch (e) {
+        console.error('文件路径无效:', selectedModel.file_path, e);
+      }
+    } else {
+      console.log('ModelViewer - 没有选中的模型');
+    }
+  }, [selectedModel]);
+
   return (
     <div className="w-full h-full">
       <Canvas
@@ -358,12 +366,20 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
       >
         <SceneLighting />
         <Suspense fallback={<LoadingIndicator />}>
-          <ModelLoader
-            modelPath={selectedModel?.file_path || ''}
-            customColor={customColor}
-            customRoughness={customRoughness}
-            customMetallic={customMetallic}
-          />
+          {selectedModel ? (
+            <ModelLoader
+              modelPath={selectedModel.file_path}
+              customColor={customColor}
+              customRoughness={customRoughness}
+              customMetallic={customMetallic}
+            />
+          ) : (
+            <DefaultModel
+              customColor={customColor}
+              customRoughness={customRoughness}
+              customMetallic={customMetallic}
+            />
+          )}
           <Environment preset="city" />
           <OrbitControls
             enableZoom={true}

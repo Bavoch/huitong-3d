@@ -558,8 +558,13 @@ export const Screen = (): JSX.Element => {
                         key={model.id}
                         className={`flex items-center justify-between p-2 my-1 rounded-lg cursor-pointer transition-colors duration-150 ${selectedModel === model.id ? 'bg-[#2268eb] text-white' : 'bg-[#2a2a2a] text-[#ffffffe6] hover:bg-[#3a3a3a]'}`}
                         onClick={() => {
+                          console.log('选择模型:', model);
                           setSelectedModel(model.id);
                           setCurrentModel(model);
+                          // 强制重新渲染
+                          setTimeout(() => {
+                            console.log('当前选中的模型:', model);
+                          }, 0);
                         }}
                       >
                         <div className="flex items-center gap-2 overflow-hidden">

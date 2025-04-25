@@ -704,7 +704,7 @@ export const Screen = (): JSX.Element => {
         <Card
           className="flex flex-col items-start gap-4 p-3 relative bg-[#ffffff0d] rounded-2xl border-0 h-full overflow-hidden"
           style={{ width: `${sidebarWidth}px` }}>
-          <CardContent className="p-0 space-y-4 w-full h-full overflow-y-auto scrollbar-thin scrollbar-thumb-[#3a3a3a] scrollbar-track-transparent">
+          <CardContent className="p-0 space-y-4 w-full h-full overflow-y-auto scrollbar-thin scrollbar-thumb-[#3a3a3a] scrollbar-track-transparent max-w-full">
             {/* Model Selection Section */}
             <div className="flex flex-col items-start gap-2 relative self-stretch w-full">
               <div className="inline-flex items-center gap-1 relative">
@@ -744,11 +744,11 @@ export const Screen = (): JSX.Element => {
                           }, 50);
                         }}
                       >
-                        <div className="flex items-center gap-2 overflow-hidden">
+                        <div className="flex items-center gap-2 overflow-hidden max-w-[calc(100%-24px)]">
                           <div className="w-6 h-6 flex-shrink-0 bg-[#ffffff1a] rounded-md flex items-center justify-center">
                             <BoxIcon className="w-4 h-4" />
                           </div>
-                          <span className="text-[14px] font-[500] truncate">{model.name}</span>
+                          <span className="text-[14px] font-[500] truncate max-w-full">{model.name}</span>
                         </div>
 
                         {/* 删除按钮，只对上传的模型显示 */}
@@ -788,38 +788,38 @@ export const Screen = (): JSX.Element => {
                 className="hidden"
                 onChange={handleFileUpload}
               />
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 w-full">
                 <Button
                   variant="ghost"
-                  className="h-8 flex-1 min-w-[80px] flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
+                  className="h-8 flex-1 min-w-0 flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <UploadIcon className="w-4 h-4 text-[#ffffffb2]" />
-                  <span className="text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal truncate">
+                  <UploadIcon className="w-4 h-4 text-[#ffffffb2] flex-shrink-0" />
+                  <span className="text-[#ffffffb2] mt-[-1.00px] text-[14px] font-[500] leading-normal truncate">
                     上传模型
                   </span>
                 </Button>
 
                 <Button
                   variant="ghost"
-                  className="h-8 flex-1 min-w-[80px] flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
+                  className="h-8 flex-1 min-w-0 flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
                   onClick={fetchModels}
                   disabled={loading}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-[#ffffffb2]">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-[#ffffffb2] flex-shrink-0">
                     <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
                     <path d="M3 3v5h5"></path>
                     <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
                     <path d="M16 21h5v-5"></path>
                   </svg>
-                  <span className="text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal truncate">
+                  <span className="text-[#ffffffb2] mt-[-1.00px] text-[14px] font-[500] leading-normal truncate">
                     刷新模型
                   </span>
                 </Button>
 
                 <Button
                   variant="ghost"
-                  className="h-8 flex-1 min-w-[80px] flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
+                  className="h-8 flex-1 min-w-0 flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
                   onClick={async () => {
                     try {
                       // 获取存储桶中的文件
@@ -912,12 +912,12 @@ export const Screen = (): JSX.Element => {
                   }}
                   disabled={loading}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-[#ffffffb2]">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-[#ffffffb2] flex-shrink-0">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                     <polyline points="17 8 12 3 7 8"></polyline>
                     <line x1="12" y1="3" x2="12" y2="15"></line>
                   </svg>
-                  <span className="text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal truncate">
+                  <span className="text-[#ffffffb2] mt-[-1.00px] text-[14px] font-[500] leading-normal truncate">
                     同步模型
                   </span>
                 </Button>
@@ -929,7 +929,7 @@ export const Screen = (): JSX.Element => {
                     className="h-8 flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
                     onClick={() => setShowUploadedModels(true)}
                   >
-                    <span className={`text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal truncate ${showUploadedModels ? 'text-[#2268eb]' : ''}`}>
+                    <span className={`text-[#ffffffb2] mt-[-1.00px] text-[14px] font-[500] leading-normal truncate ${showUploadedModels ? 'text-[#2268eb]' : ''}`}>
                       上传模型
                     </span>
                   </Button>
@@ -939,7 +939,7 @@ export const Screen = (): JSX.Element => {
                     className="h-8 flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
                     onClick={() => setShowUploadedModels(false)}
                   >
-                    <span className={`text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal truncate ${!showUploadedModels ? 'text-[#2268eb]' : ''}`}>
+                    <span className={`text-[#ffffffb2] mt-[-1.00px] text-[14px] font-[500] leading-normal truncate ${!showUploadedModels ? 'text-[#2268eb]' : ''}`}>
                       内置模型
                     </span>
                   </Button>
@@ -952,7 +952,7 @@ export const Screen = (): JSX.Element => {
                   className="h-8 w-full flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33] mt-2"
                   onClick={clearUploadedModels}
                 >
-                  <span className="text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal truncate">
+                  <span className="text-[#ffffffb2] mt-[-1.00px] text-[14px] font-[500] leading-normal truncate">
                     清除所有上传模型
                   </span>
                 </Button>
@@ -1032,7 +1032,7 @@ export const Screen = (): JSX.Element => {
                       {materials.map((material) => (
                         <div
                           key={material.id}
-                          className={`flex w-[calc(33.33%-6px)] h-[60px] items-center gap-1 p-2.5 relative bg-[#ffffff0d] rounded-lg ${material.id === selectedMaterialId ? "border border-solid border-[#2268eb]" : ""}`}
+                          className={`flex w-[calc(33.33%-6px)] h-[60px] items-center gap-1 p-2.5 relative bg-[#ffffff0d] rounded-lg overflow-hidden ${material.id === selectedMaterialId ? "border border-solid border-[#2268eb]" : ""}`}
                           onClick={() => {
                             // 选中这个材质
                             setSelectedMaterialId(material.id);
@@ -1070,26 +1070,26 @@ export const Screen = (): JSX.Element => {
 
                 <TabsContent value="custom" className="mt-3 space-y-4">
                   {/* Color Picker */}
-                  <div className="space-y-2">
+                  <div className="space-y-2 w-full">
                     <label className="text-[#ffffffb2] text-[14px] font-[500] leading-normal">颜色</label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 w-full">
                       <input
                         type="color"
                         value={customColor}
                         onChange={(e) => setCustomColor(e.target.value)}
-                        className="w-8 h-8 bg-[#00000026] rounded-lg border-0 cursor-pointer [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none"
+                        className="w-8 h-8 bg-[#00000026] rounded-lg border-0 cursor-pointer [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none flex-shrink-0"
                       />
                       <Input
                         value={customColor.toUpperCase()}
                         onChange={(e) => setCustomColor(e.target.value)}
-                        className="flex-1 h-8 px-2 py-1.5 bg-[#00000026] text-[#ffffffe6] text-[14px] font-[500] leading-normal border-0 rounded-lg focus-visible:ring-0 focus-visible:ring-offset-0 uppercase"
+                        className="flex-1 min-w-0 h-8 px-2 py-1.5 bg-[#00000026] text-[#ffffffe6] text-[14px] font-[500] leading-normal border-0 rounded-lg focus-visible:ring-0 focus-visible:ring-offset-0 uppercase"
                       />
                     </div>
                   </div>
 
                   {/* Roughness Slider */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
+                  <div className="space-y-2 w-full">
+                    <div className="flex justify-between w-full">
                       <label className="text-[#ffffffb2] text-[14px] font-[500] leading-normal">粗糙度</label>
                       <span className="text-[#ffffff66] text-[14px] font-[500] leading-normal">{customRoughness}</span>
                     </div>
@@ -1105,8 +1105,8 @@ export const Screen = (): JSX.Element => {
                   </div>
 
                   {/* Metallic Slider */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
+                  <div className="space-y-2 w-full">
+                    <div className="flex justify-between w-full">
                       <label className="text-[#ffffffb2] text-[14px] font-[500] leading-normal">金属度</label>
                       <span className="text-[#ffffff66] text-[14px] font-[500] leading-normal">{customMetallic}</span>
                     </div>

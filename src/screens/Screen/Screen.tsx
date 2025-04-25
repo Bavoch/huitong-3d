@@ -593,10 +593,42 @@ export const Screen = (): JSX.Element => {
     fetchMaterials();
   }, []);
 
+  // 添加窗口大小变化监听
+  useEffect(() => {
+    // 调整内容区域高度的函数
+    const adjustContentHeight = () => {
+      if (mainContentRef.current) {
+        const windowHeight = window.innerHeight;
+        const headerHeight = 64; // 头部高度 + padding
+        const contentHeight = windowHeight - headerHeight;
+        mainContentRef.current.style.height = `${contentHeight}px`;
+
+        console.log('窗口调整:', {
+          windowHeight,
+          headerHeight,
+          contentHeight,
+          mainContentWidth: mainContentRef.current.offsetWidth,
+          sidebarWidth
+        });
+      }
+    };
+
+    // 初始调整
+    adjustContentHeight();
+
+    // 监听窗口大小变化
+    window.addEventListener('resize', adjustContentHeight);
+
+    // 清理函数
+    return () => {
+      window.removeEventListener('resize', adjustContentHeight);
+    };
+  }, [sidebarWidth]);
+
   return (
-    <main className="flex flex-col min-h-screen items-start gap-5 p-5 relative bg-[#191919]">
+    <main className="flex flex-col h-screen items-start gap-5 p-5 relative bg-[#191919] overflow-hidden">
       {/* Header */}
-      <header className="flex items-center justify-between pl-2 pr-0 py-0 relative self-stretch w-full">
+      <header className="flex items-center justify-between pl-2 pr-0 py-0 relative self-stretch w-full flex-shrink-0">
         <img
           className="relative w-[78px] h-6 object-contain"
           alt="Logo"
@@ -623,10 +655,10 @@ export const Screen = (): JSX.Element => {
         </div>
       </header>
 
-      {/* Main content area */}
-      <div ref={mainContentRef} className="flex items-start relative flex-1 self-stretch w-full grow">
+      {/* Main content area - 使用flex-1确保填充剩余空间 */}
+      <div ref={mainContentRef} className="flex items-stretch relative w-full flex-1 overflow-hidden">
         {/* 3D Preview Area */}
-        <Card className="relative flex-1 self-stretch grow bg-[#ffffff0d] rounded-2xl overflow-hidden border-0">
+        <Card className="relative flex-1 bg-[#ffffff0d] rounded-2xl overflow-hidden border-0 h-full">
           <CardContent className="p-0 h-full relative">
             {currentModel ? (
               <ModelViewer
@@ -679,9 +711,9 @@ export const Screen = (): JSX.Element => {
 
         {/* Sidebar */}
         <Card
-          className="flex flex-col items-start gap-4 p-3 relative self-stretch bg-[#ffffff0d] rounded-2xl border-0"
+          className="flex flex-col items-start gap-4 p-3 relative bg-[#ffffff0d] rounded-2xl border-0 h-full overflow-hidden"
           style={{ width: `${sidebarWidth}px` }}>
-          <CardContent className="p-0 space-y-4 w-full">
+          <CardContent className="p-0 space-y-4 w-full h-full overflow-y-auto scrollbar-thin scrollbar-thumb-[#3a3a3a] scrollbar-track-transparent">
             {/* Model Selection Section */}
             <div className="flex flex-col items-start gap-2 relative self-stretch w-full">
               <div className="inline-flex items-center gap-1 relative">
@@ -692,7 +724,7 @@ export const Screen = (): JSX.Element => {
               </div>
 
               {/* 模型卡片列表 */}
-              <div className="max-h-[280px] overflow-y-auto pr-1 mb-2 scrollbar-thin scrollbar-thumb-[#3a3a3a] scrollbar-track-transparent">
+              <div className="max-h-[30vh] overflow-y-auto pr-1 mb-2 scrollbar-thin scrollbar-thumb-[#3a3a3a] scrollbar-track-transparent">
                 {loading ? (
                   <div className="p-4 text-center text-[#ffffff80] text-[14px]">
                     <div className="flex justify-center items-center space-x-2">
@@ -1005,7 +1037,7 @@ export const Screen = (): JSX.Element => {
                     </div>
 
                     {/* Material Grid */}
-                    <div className="flex flex-wrap w-full items-start gap-[8px] relative flex-1 grow overflow-hidden">
+                    <div className="flex flex-wrap w-full items-start gap-[8px] relative flex-1 max-h-[30vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[#3a3a3a] scrollbar-track-transparent">
                       {materials.map((material) => (
                         <div
                           key={material.id}

@@ -698,15 +698,6 @@ export const Screen = (): JSX.Element => {
               isDragging ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'bg-transparent group-hover:bg-blue-500'
             }`}
           ></div>
-
-          {/* 拖拽指示器 - 只在悬停时显示 */}
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-              <polyline points="12 5 19 12 12 19"></polyline>
-              <polyline points="12 5 5 12 12 19"></polyline>
-            </svg>
-          </div>
         </div>
 
         {/* Sidebar */}

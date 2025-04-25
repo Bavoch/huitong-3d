@@ -685,22 +685,22 @@ export const Screen = (): JSX.Element => {
           </CardContent>
         </Card>
 
-        {/* 可拖拽分隔线区域 */}
+        {/* 可拖拽分隔线区域 - 只在悬停时显示 */}
         <div
-          className="relative w-5 mx-0 self-stretch cursor-col-resize group bg-[#ffffff0d] hover:bg-[#ffffff1a]"
+          className="relative w-5 mx-0 self-stretch cursor-col-resize group bg-transparent hover:bg-[#ffffff0d]"
           onMouseDown={handleDividerMouseDown}
           title="拖拽调整宽度"
           id="divider-handle"
         >
-          {/* 实际的分隔线 */}
+          {/* 实际的分隔线 - 只在悬停或拖拽时显示 */}
           <div
-            className={`absolute left-1/2 transform -translate-x-1/2 w-[2px] h-full ${
-              isDragging ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'bg-blue-500'
+            className={`absolute left-1/2 transform -translate-x-1/2 w-[2px] h-full transition-all duration-200 ${
+              isDragging ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'bg-transparent group-hover:bg-blue-500'
             }`}
           ></div>
 
-          {/* 拖拽指示器 */}
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+          {/* 拖拽指示器 - 只在悬停时显示 */}
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
               <line x1="5" y1="12" x2="19" y2="12"></line>
               <polyline points="12 5 19 12 12 19"></polyline>

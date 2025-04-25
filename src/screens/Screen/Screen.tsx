@@ -715,11 +715,11 @@ export const Screen = (): JSX.Element => {
               </div>
 
               {/* 模型卡片列表 */}
-              <div className="max-h-[30vh] overflow-y-auto pr-1 mb-2 scrollbar-thin scrollbar-thumb-[#3a3a3a] scrollbar-track-transparent">
+              <div className="max-h-[30vh] overflow-y-auto pr-1 mb-2 scrollbar-thin scrollbar-thumb-[#3a3a3a] scrollbar-track-transparent w-full">
                 {loading ? (
-                  <div className="p-4 text-center text-[#ffffff80] text-[14px]">
+                  <div className="p-4 text-center text-[#ffffff80] text-[14px] w-full">
                     <div className="flex justify-center items-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
                       <span>加载模型中...</span>
                     </div>
                   </div>
@@ -729,7 +729,7 @@ export const Screen = (): JSX.Element => {
                     {(showUploadedModels ? uploadedModels : models).map((model) => (
                       <div
                         key={model.id}
-                        className={`flex items-center justify-between p-2 my-1 rounded-lg cursor-pointer transition-colors duration-150 ${selectedModel === model.id ? 'bg-[#2268eb] text-white' : 'bg-[#2a2a2a] text-[#ffffffe6] hover:bg-[#3a3a3a]'}`}
+                        className={`flex items-center justify-between p-2 my-1 rounded-lg cursor-pointer transition-colors duration-150 w-full ${selectedModel === model.id ? 'bg-[#2268eb] text-white' : 'bg-[#2a2a2a] text-[#ffffffe6] hover:bg-[#3a3a3a]'}`}
                         onClick={() => {
                           console.log('选择模型:', model);
                           // 先清除当前模型，然后设置新模型，确保状态更新
@@ -744,24 +744,24 @@ export const Screen = (): JSX.Element => {
                           }, 50);
                         }}
                       >
-                        <div className="flex items-center gap-2 overflow-hidden max-w-[calc(100%-24px)]">
+                        <div className="flex items-center gap-2 overflow-hidden max-w-[calc(100%-28px)] flex-1">
                           <div className="w-6 h-6 flex-shrink-0 bg-[#ffffff1a] rounded-md flex items-center justify-center">
                             <BoxIcon className="w-4 h-4" />
                           </div>
-                          <span className="text-[14px] font-[500] truncate max-w-full">{model.name}</span>
+                          <span className="text-[14px] font-[500] truncate min-w-0 flex-1">{model.name}</span>
                         </div>
 
                         {/* 删除按钮，只对上传的模型显示 */}
                         {showUploadedModels && (
                           <button
-                            className={`p-1 rounded-md ${selectedModel === model.id ? 'hover:bg-[#4b83f0] text-white' : 'hover:bg-[#ffffff1a] text-[#ffffff80]'}`}
+                            className={`p-1 rounded-md flex-shrink-0 ${selectedModel === model.id ? 'hover:bg-[#4b83f0] text-white' : 'hover:bg-[#ffffff1a] text-[#ffffff80]'}`}
                             onClick={(e) => {
                               e.stopPropagation(); // 阻止事件冒泡到父元素
                               deleteUploadedModel(model.id);
                             }}
                             title="删除模型"
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                               <path d="M3 6h18"></path>
                               <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
                               <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
@@ -773,7 +773,7 @@ export const Screen = (): JSX.Element => {
 
                     {/* 当没有模型时显示提示 */}
                     {(showUploadedModels ? uploadedModels : models).length === 0 && (
-                      <div className="p-4 text-center text-[#ffffff80] text-[14px]">
+                      <div className="p-4 text-center text-[#ffffff80] text-[14px] w-full">
                         {showUploadedModels ? '没有上传的模型' : '没有可用的模型'}
                       </div>
                     )}

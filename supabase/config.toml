@@ -94,7 +94,13 @@ file_size_limit = "50MiB"
 # [storage.image_transformation]
 # enabled = true
 
-# Uncomment to configure local storage buckets
+# Configure storage buckets
+[storage.buckets.models]
+public = true
+file_size_limit = "50MiB"
+allowed_mime_types = ["model/gltf-binary", "model/gltf+json", "application/octet-stream"]
+
+# Example image bucket configuration
 # [storage.buckets.images]
 # public = false
 # file_size_limit = "50MiB"

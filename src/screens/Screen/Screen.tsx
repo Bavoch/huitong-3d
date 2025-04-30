@@ -20,6 +20,12 @@ import {
 } from "../../components/ui/tabs";
 import { supabase, type Model } from "../../lib/supabase";
 import ModelViewer from "../../components/ModelViewer";
+import {
+  processModelFile,
+  validateModelFile,
+  checkFileSize,
+  getFileMimeType
+} from "../../utils/modelProcessor";
 
 export const Screen = (): JSX.Element => {
   const [models, setModels] = useState<Model[]>([]);
@@ -42,81 +48,112 @@ export const Screen = (): JSX.Element => {
 
     const file = files[0];
     const fileName = file.name;
-    const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
-    const validExtensions = ['glb', 'gltf', 'obj', 'fbx'];
 
-    if (!validExtensions.includes(fileExtension)) {
+    // 使用模型处理工具验证文件
+    const isValid = await validateModelFile(file);
+    if (!isValid) {
       alert('请上传有效的3D模型文件（.glb, .gltf, .obj, .fbx）');
       return;
     }
 
-    // 创建文件URL
-    const fileURL = URL.createObjectURL(file);
-
-    // 创建新的模型对象
-    const currentTime = new Date().toISOString();
-    const newModel: Model = {
-      id: `uploaded-${Date.now()}`,
-      name: fileName,
-      file_path: fileURL,
-      description: `上传的模型: ${fileName}`,
-      created_at: currentTime,
-      updated_at: currentTime
-    };
-
-    // 尝试将文件上传到Supabase Storage
-    try {
-      // 上传文件到Supabase存储桶
-      const { data, error } = await supabase.storage
-        .from('models')
-        .upload(`${Date.now()}_${fileName}`, file);
-
-      if (error) {
-        console.error('上传到Supabase失败:', error);
-        // 即使上传失败，仍然在本地显示模型
-      } else {
-        console.log('模型文件已上传到Supabase:', data);
-        // 获取公共URL并替换本地URL
-        const { data: { publicUrl } } = supabase.storage.from('models').getPublicUrl(data.path);
-
-        // 创建模型记录
-        const { data: modelData, error: modelError } = await supabase
-          .from('models')
-          .insert([
-            {
-              name: fileName,
-              file_path: publicUrl,
-              description: `上传的模型: ${fileName}`,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            }
-          ])
-          .select();
-
-        if (modelError) {
-          console.error('添加模型记录失败:', modelError);
-        } else {
-          console.log('成功添加模型记录:', modelData);
-          // 使用返回的数据更新模型URL
-          if (modelData && modelData.length > 0) {
-            newModel.id = modelData[0].id;
-            newModel.file_path = publicUrl;
-          }
-        }
-      }
-    } catch (uploadError) {
-      console.error('上传过程中出错:', uploadError);
+    // 检查文件大小
+    if (!checkFileSize(file, 50)) {
+      alert('文件大小超过限制（最大50MB）');
+      return;
     }
 
-    // 添加到上传模型列表
-    setUploadedModels(prev => [...prev, newModel]);
+    // 显示处理中的提示
+    console.log('正在处理模型文件，请稍候...');
 
-    // 切换到显示上传模型
-    setShowUploadedModels(true);
+    try {
+      // 处理模型文件（压缩和优化）
+      const { processedFile, metadata } = await processModelFile(file);
+      console.log('模型处理完成:', metadata);
 
-    // 自动选择新上传的模型
-    setSelectedModel(newModel.id);
-    setCurrentModel(newModel);
+      // 如果有压缩，显示压缩比
+      if (metadata.compressionRatio < 1) {
+        console.log(`文件已压缩: ${(100 - metadata.compressionRatio * 100).toFixed(1)}% 的减少`);
+      }
+
+      // 创建文件URL用于本地预览
+      const fileURL = URL.createObjectURL(processedFile);
+
+      // 创建新的模型对象用于本地预览
+      const currentTime = new Date().toISOString();
+      const newModel: Model = {
+        id: `uploaded-${Date.now()}`,
+        name: fileName,
+        file_path: fileURL,
+        description: `上传的模型: ${fileName} (${(metadata.processedSize / (1024 * 1024)).toFixed(2)}MB)`,
+        created_at: currentTime,
+        updated_at: currentTime
+      };
+
+      // 确保存储桶存在
+      await ensureModelsBucketExists();
+
+      // 上传文件到Supabase存储桶
+      try {
+        // 设置正确的MIME类型
+        const contentType = getFileMimeType(processedFile instanceof File ? processedFile : file);
+
+        // 生成唯一文件名，避免覆盖
+        const uniqueFileName = `${Date.now()}_${fileName}`;
+
+        // 上传文件到Supabase存储桶
+        const { data, error } = await supabase.storage
+          .from('models')
+          .upload(uniqueFileName, processedFile, {
+            contentType,
+            upsert: false // 不覆盖同名文件
+          });
+
+        if (error) {
+          console.error('上传到Supabase失败:', error);
+          alert('上传模型到存储桶失败，请稍后重试');
+
+          // 清理本地资源
+          URL.revokeObjectURL(fileURL);
+
+          // 清空文件输入，允许再次上传
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+
+          return;
+        }
+
+        console.log('模型文件已上传到Supabase:', data);
+
+        // 获取公共URL
+        const { data: { publicUrl } } = supabase.storage.from('models').getPublicUrl(data.path);
+
+        // 更新模型对象，使用存储桶URL
+        newModel.file_path = publicUrl;
+
+        // 添加到上传模型列表
+        setUploadedModels(prev => [...prev, newModel]);
+
+        // 自动选择新上传的模型
+        setSelectedModel(newModel.id);
+        setCurrentModel(newModel);
+
+        // 重新获取所有模型，确保数据库和存储桶同步
+        fetchModels();
+
+        // 显示成功消息
+        console.log('模型上传成功，已添加到存储桶');
+      } catch (uploadError) {
+        console.error('上传过程中出错:', uploadError);
+        alert('上传过程中出错，请稍后重试');
+
+        // 清理本地资源
+        URL.revokeObjectURL(fileURL);
+      }
+    } catch (processingError) {
+      console.error('处理模型文件时出错:', processingError);
+      alert('处理模型文件时出错，请尝试其他文件');
+    }
 
     // 清空文件输入，允许再次上传相同文件
     if (fileInputRef.current) {
@@ -192,207 +229,168 @@ export const Screen = (): JSX.Element => {
   const fetchModels = async () => {
     setLoading(true);
     try {
-      // 首先尝试从 models 表中获取所有模型数据
-      const { data: modelData, error: modelError } = await supabase
-        .from('models')
-        .select('*')
-        .order('created_at', { ascending: false }); // 按创建时间降序排列，最新的在前面
+      // 检查存储桶是否存在，如果不存在则创建
+      await ensureModelsBucketExists();
 
-      if (modelError) {
-        console.error('获取模型数据错误:', modelError);
-      }
+      // 从存储桶获取模型文件
+      const storageModels = await getModelsFromStorage();
 
-      // 如果有模型数据，使用它
-      if (modelData && modelData.length > 0) {
-        console.log('从 Supabase 表中获取到的模型数据:', modelData);
-
-        // 确保每个模型都有有效的ID（字符串类型）
-        const processedModels = modelData.map(model => ({
-          ...model,
-          id: model.id.toString() // 确保ID是字符串类型
-        }));
-
-        setModels(processedModels);
+      if (storageModels.length > 0) {
+        // 使用从存储桶获取的模型
+        console.log('从存储桶获取到的模型:', storageModels);
+        setModels(storageModels);
 
         // 如果没有当前选中的模型，选择第一个
         if (!currentModel && !showUploadedModels) {
-          setSelectedModel(processedModels[0].id);
-          setCurrentModel(processedModels[0]);
+          setSelectedModel(storageModels[0].id);
+          setCurrentModel(storageModels[0]);
         }
+
+        // 同步数据库中的模型记录
+        await syncModelsWithDatabase(storageModels);
       } else {
-        console.log('models表中没有找到模型数据，尝试加载示例模型');
-
-        // 尝试加载示例模型数据
-        try {
-          const response = await fetch('/sample-models/sample-models.json');
-          if (response.ok) {
-            const sampleModels = await response.json();
-            console.log('加载示例模型数据:', sampleModels);
-
-            setModels(sampleModels);
-
-            // 如果没有当前选中的模型，选择第一个
-            if (!currentModel && !showUploadedModels) {
-              setSelectedModel(sampleModels[0].id);
-              setCurrentModel(sampleModels[0]);
-            }
-
-            // 尝试将示例模型保存到 Supabase
-            for (const model of sampleModels) {
-              try {
-                const { error: insertError } = await supabase
-                  .from('models')
-                  .insert([{
-                    name: model.name,
-                    description: model.description,
-                    file_path: model.file_path,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                  }]);
-
-                if (insertError) {
-                  console.error(`保存示例模型 ${model.name} 到 Supabase 失败:`, insertError);
-                } else {
-                  console.log(`成功保存示例模型 ${model.name} 到 Supabase`);
-                }
-              } catch (insertErr) {
-                console.error(`保存示例模型 ${model.name} 时出错:`, insertErr);
-              }
-            }
-
-            // 加载示例模型后返回，不再尝试从存储桶获取
-            setLoading(false);
-            return;
-          }
-        } catch (sampleError) {
-          console.error('加载示例模型数据失败:', sampleError);
-        }
-
-        console.log('尝试从存储桶获取模型数据');
-
-        // 如果models表中没有数据，尝试直接从存储桶获取文件
-        console.log('尝试从存储桶获取模型文件...');
-
-        // 检查存储桶是否存在
-        const { data: buckets, error: bucketsError } = await supabase
-          .storage
-          .listBuckets();
-
-        if (bucketsError) {
-          console.error('获取存储桶列表错误:', bucketsError);
-        } else {
-          console.log('可用的存储桶:', buckets);
-
-          // 检查是否有名为'models'的存储桶
-          const modelsBucket = buckets.find(bucket => bucket.name === 'models');
-          if (!modelsBucket) {
-            console.log('没有找到名为"models"的存储桶，尝试创建...');
-            try {
-              const { data, error } = await supabase.storage.createBucket('models', {
-                public: true
-              });
-              if (error) {
-                console.error('创建存储桶失败:', error);
-              } else {
-                console.log('成功创建"models"存储桶:', data);
-              }
-            } catch (createError) {
-              console.error('创建存储桶时出错:', createError);
-            }
-          } else {
-            console.log('找到"models"存储桶:', modelsBucket);
-          }
-        }
-
-        // 列出存储桶中的文件
-        const { data: storageData, error: storageError } = await supabase
-          .storage
-          .from('models')
-          .list();
-
-        if (storageError) {
-          console.error('获取存储桶数据错误:', storageError);
-          return;
-        }
-
-        console.log('存储桶列表响应:', { data: storageData, error: storageError });
-
-        if (storageData && storageData.length > 0) {
-          console.log('从存储桶获取到的文件:', storageData);
-
-          // 过滤出3D模型文件（通常是.glb, .gltf, .obj, .fbx等格式）
-          const modelFiles = storageData.filter(file => {
-            const extension = file.name.split('.').pop()?.toLowerCase();
-            return ['glb', 'gltf', 'obj', 'fbx'].includes(extension || '');
-          });
-
-          if (modelFiles.length > 0) {
-            // 将存储桶中的文件转换为模型数据格式
-            const storageModels: Model[] = await Promise.all(modelFiles.map(async (file) => {
-              // 获取文件的公共URL
-              const { data: { publicUrl } } = supabase
-                .storage
-                .from('models')
-                .getPublicUrl(file.name);
-
-              return {
-                id: `storage_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-                name: file.name,
-                description: `存储桶中的模型: ${file.name}`,
-                file_path: publicUrl,
-                created_at: file.created_at,
-                updated_at: file.updated_at
-              };
-            }));
-
-            console.log('从存储桶创建的模型数据:', storageModels);
-            setModels(storageModels);
-
-            // 如果没有当前选中的模型，选择第一个
-            if (!currentModel && !showUploadedModels) {
-              setSelectedModel(storageModels[0].id);
-              setCurrentModel(storageModels[0]);
-            }
-
-            // 将这些模型数据保存到models表中，以便将来使用
-            try {
-              // 为每个模型创建一个插入记录
-              for (const model of storageModels) {
-                const { error: insertError } = await supabase
-                  .from('models')
-                  .insert([{
-                    name: model.name,
-                    description: model.description,
-                    file_path: model.file_path,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                  }]);
-
-                if (insertError) {
-                  console.error(`保存模型 ${model.name} 到表中出错:`, insertError);
-                } else {
-                  console.log(`已将模型 ${model.name} 保存到models表`);
-                }
-              }
-
-              // 保存完成后重新获取模型列表
-              fetchModels();
-            } catch (insertErr) {
-              console.error('尝试保存模型数据时出错:', insertErr);
-            }
-          } else {
-            console.log('存储桶中没有找到有效的3D模型文件');
-            setModels([]);
-          }
-        } else {
-          console.log('存储桶中没有找到文件');
-          setModels([]);
-        }
+        console.log('存储桶中没有找到模型文件');
+        setModels([]);
       }
     } catch (error) {
       console.error('获取模型时出错:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 确保models存储桶存在
+  const ensureModelsBucketExists = async () => {
+    try {
+      // 检查存储桶是否存在
+      const { data: buckets, error: bucketsError } = await supabase
+        .storage
+        .listBuckets();
+
+      if (bucketsError) {
+        console.error('获取存储桶列表错误:', bucketsError);
+        return false;
+      }
+
+      // 检查是否有名为'models'的存储桶
+      const modelsBucket = buckets.find(bucket => bucket.name === 'models');
+      if (!modelsBucket) {
+        console.log('没有找到名为"models"的存储桶，尝试创建...');
+        const { data, error } = await supabase.storage.createBucket('models', {
+          public: true,
+          fileSizeLimit: 50 * 1024 * 1024, // 50MB
+          allowedMimeTypes: ['model/gltf-binary', 'model/gltf+json', 'application/octet-stream']
+        });
+
+        if (error) {
+          console.error('创建存储桶失败:', error);
+          return false;
+        } else {
+          console.log('成功创建"models"存储桶:', data);
+          return true;
+        }
+      } else {
+        console.log('找到"models"存储桶:', modelsBucket);
+        return true;
+      }
+    } catch (error) {
+      console.error('检查/创建存储桶时出错:', error);
+      return false;
+    }
+  };
+
+  // 从存储桶获取模型
+  const getModelsFromStorage = async (): Promise<Model[]> => {
+    try {
+      // 列出存储桶中的文件
+      const { data: storageData, error: storageError } = await supabase
+        .storage
+        .from('models')
+        .list();
+
+      if (storageError) {
+        console.error('获取存储桶数据错误:', storageError);
+        return [];
+      }
+
+      if (!storageData || storageData.length === 0) {
+        console.log('存储桶中没有找到文件');
+        return [];
+      }
+
+      console.log('从存储桶获取到的文件:', storageData);
+
+      // 过滤出3D模型文件
+      const modelFiles = storageData.filter(file => {
+        const extension = file.name.split('.').pop()?.toLowerCase();
+        return ['glb', 'gltf', 'obj', 'fbx'].includes(extension || '');
+      });
+
+      if (modelFiles.length === 0) {
+        console.log('存储桶中没有找到有效的3D模型文件');
+        return [];
+      }
+
+      // 将存储桶中的文件转换为模型数据格式
+      const storageModels: Model[] = await Promise.all(modelFiles.map(async (file) => {
+        // 获取文件的公共URL
+        const { data: { publicUrl } } = supabase
+          .storage
+          .from('models')
+          .getPublicUrl(file.name);
+
+        return {
+          id: `storage_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+          name: file.name,
+          description: `存储桶中的模型: ${file.name}`,
+          file_path: publicUrl,
+          created_at: file.created_at || new Date().toISOString(),
+          updated_at: file.updated_at || new Date().toISOString()
+        };
+      }));
+
+      return storageModels;
+    } catch (error) {
+      console.error('从存储桶获取模型时出错:', error);
+      return [];
+    }
+  };
+
+  // 同步数据库中的模型记录
+  const syncModelsWithDatabase = async (storageModels: Model[]) => {
+    try {
+      // 首先清理数据库中的所有记录
+      const { error: deleteError } = await supabase
+        .from('models')
+        .delete()
+        .neq('id', 0); // 删除所有记录
+
+      if (deleteError) {
+        console.error('清理数据库记录失败:', deleteError);
+      } else {
+        console.log('已清理数据库中的旧记录');
+      }
+
+      // 为每个存储桶中的模型创建新记录
+      for (const model of storageModels) {
+        const { error: insertError } = await supabase
+          .from('models')
+          .insert([{
+            name: model.name,
+            description: model.description,
+            file_path: model.file_path,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }]);
+
+        if (insertError) {
+          console.error(`保存模型 ${model.name} 到表中出错:`, insertError);
+        } else {
+          console.log(`已将模型 ${model.name} 保存到models表`);
+        }
+      }
+    } catch (error) {
+      console.error('同步数据库记录时出错:', error);
     }
   };
 
@@ -788,7 +786,7 @@ export const Screen = (): JSX.Element => {
                 className="hidden"
                 onChange={handleFileUpload}
               />
-              <div className="flex flex-wrap gap-2 w-full">
+              <div className="flex gap-2 w-full">
                 <Button
                   variant="ghost"
                   className="h-8 flex-1 min-w-0 flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
@@ -814,111 +812,6 @@ export const Screen = (): JSX.Element => {
                   </svg>
                   <span className="text-[#ffffffb2] mt-[-1.00px] text-[14px] font-[500] leading-normal truncate">
                     刷新模型
-                  </span>
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  className="h-8 flex-1 min-w-0 flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
-                  onClick={async () => {
-                    try {
-                      // 获取存储桶中的文件
-                      const { data: storageData, error: storageError } = await supabase
-                        .storage
-                        .from('models')
-                        .list();
-
-                      if (storageError) {
-                        console.error('获取存储桶数据错误:', storageError);
-                        alert('获取存储桶数据失败');
-                        return;
-                      }
-
-                      if (!storageData || storageData.length === 0) {
-                        alert('存储桶中没有文件');
-                        return;
-                      }
-
-                      // 过滤出3D模型文件
-                      const modelFiles = storageData.filter(file => {
-                        const extension = file.name.split('.').pop()?.toLowerCase();
-                        return ['glb', 'gltf', 'obj', 'fbx'].includes(extension || '');
-                      });
-
-                      if (modelFiles.length === 0) {
-                        alert('存储桶中没有3D模型文件');
-                        return;
-                      }
-
-                      // 获取已有的模型记录
-                      const { data: existingModels, error: fetchError } = await supabase
-                        .from('models')
-                        .select('file_path');
-
-                      if (fetchError) {
-                        console.error('获取现有模型数据错误:', fetchError);
-                      }
-
-                      // 创建一个已有模型URL的集合，用于快速查找
-                      const existingUrls = new Set(existingModels?.map(model => model.file_path) || []);
-
-                      // 计数器
-                      let addedCount = 0;
-                      let skippedCount = 0;
-
-                      // 为每个模型文件创建记录
-                      for (const file of modelFiles) {
-                        // 获取文件的公共URL
-                        const { data: { publicUrl } } = supabase
-                          .storage
-                          .from('models')
-                          .getPublicUrl(file.name);
-
-                        // 检查是否已存在相同URL的模型
-                        if (existingUrls.has(publicUrl)) {
-                          console.log(`模型 ${file.name} 已存在，跳过`);
-                          skippedCount++;
-                          continue;
-                        }
-
-                        // 插入新模型记录
-                        const { error: insertError } = await supabase
-                          .from('models')
-                          .insert([{
-                            name: file.name,
-                            description: `存储桶中的模型: ${file.name}`,
-                            file_path: publicUrl,
-                            created_at: new Date().toISOString(),
-                            updated_at: new Date().toISOString()
-                          }]);
-
-                        if (insertError) {
-                          console.error(`保存模型 ${file.name} 到表中出错:`, insertError);
-                        } else {
-                          console.log(`已将模型 ${file.name} 保存到models表`);
-                          addedCount++;
-                        }
-                      }
-
-                      // 显示结果
-                      alert(`同步完成: 新增 ${addedCount} 个模型，跳过 ${skippedCount} 个已存在的模型`);
-
-                      // 刷新模型列表
-                      fetchModels();
-                    } catch (error) {
-                      console.error('同步模型数据时出错:', error);
-                      alert('同步模型数据失败');
-                    }
-                  }}
-                  disabled={loading}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-[#ffffffb2] flex-shrink-0">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="17 8 12 3 7 8"></polyline>
-                    <line x1="12" y1="3" x2="12" y2="15"></line>
-                  </svg>
-                  <span className="text-[#ffffffb2] mt-[-1.00px] text-[14px] font-[500] leading-normal truncate">
-                    同步模型
                   </span>
                 </Button>
               </div>

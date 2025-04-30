@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "upload-models": "node scripts/upload-sample-models.js"
+    "upload-models": "node scripts/upload-sample-models.js",
+    "start": "node start-dev.js",
+    "stop": "node stop-dev.js"
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.1.2",

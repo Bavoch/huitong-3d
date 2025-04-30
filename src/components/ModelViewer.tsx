@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, Suspense, useCallback } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, useGLTF, Environment, PresentationControls, Html, Text } from '@react-three/drei';
+import { OrbitControls, useGLTF, Html, Text, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { type Model } from '../lib/supabase';
 
@@ -70,12 +70,14 @@ function ModelLoader({
   modelPath,
   customColor,
   customRoughness,
-  customMetallic
+  customMetallic,
+  autoRotate
 }: {
   modelPath: string;
   customColor: string;
   customRoughness: number;
   customMetallic: number;
+  autoRotate: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [useDefaultModel, setUseDefaultModel] = useState(false);
@@ -143,9 +145,9 @@ function ModelLoader({
     }
   }, [modelPath, loadAttempts]);
 
-  // 添加简单的旋转动画
+  // 添加简单的旋转动画，根据autoRotate状态决定是否旋转
   useFrame(() => {
-    if (groupRef.current) {
+    if (groupRef.current && autoRotate) {
       groupRef.current.rotation.y += 0.005;
     }
   });
@@ -510,6 +512,29 @@ function ModelObject({
     );
   }
 
+  // 添加一个新的useEffect来监听材质属性的变化
+  useEffect(() => {
+    // 如果模型已加载，更新材质
+    if (modelScene) {
+      console.log('材质属性变化，更新模型材质:', { customColor, customRoughness, customMetallic });
+
+      // 创建新的材质
+      const material = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(customColor),
+        roughness: customRoughness,
+        metalness: customMetallic,
+      });
+
+      // 遍历场景中的所有网格，更新材质
+      modelScene.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          // 应用新材质
+          child.material = material;
+        }
+      });
+    }
+  }, [customColor, customRoughness, customMetallic, modelScene]);
+
   return modelScene ? (
     <primitive object={modelScene} />
   ) : (
@@ -517,14 +542,19 @@ function ModelObject({
   );
 }
 
-// 设置场景光照
+// 设置场景光照 - 使用简单光照，主要依赖HDR环境贴图
 function SceneLighting() {
   return (
     <>
-      <ambientLight intensity={0.7} />
-      <directionalLight position={[10, 10, 5]} intensity={1.5} />
-      <directionalLight position={[-10, -10, -5]} intensity={0.8} />
-      <hemisphereLight intensity={0.5} groundColor="#444444" />
+      {/* 基础环境光 - 较低强度，因为HDR环境贴图会提供主要光照 */}
+      <ambientLight intensity={0.3} />
+
+      {/* 主光源 - 提供主要方向性光照和阴影 */}
+      <directionalLight
+        position={[10, 10, 5]}
+        intensity={0.8}
+        castShadow
+      />
     </>
   );
 }
@@ -535,19 +565,25 @@ interface ModelViewerProps {
   customColor: string;
   customRoughness: number;
   customMetallic: number;
+  isCapturingMode?: boolean; // 是否处于截图预览模式
 }
 
 export const ModelViewer: React.FC<ModelViewerProps> = ({
   selectedModel,
   customColor,
   customRoughness,
-  customMetallic
+  customMetallic,
+  isCapturingMode = false
 }) => {
   console.log('渲染ModelViewer组件，选中的模型:', selectedModel);
   const [modelViewKey, setModelViewKey] = useState<string>('');
   const [modelValid, setModelValid] = useState<boolean>(true);
   const [modelPath, setModelPath] = useState<string>('');
+  const [autoRotate, setAutoRotate] = useState<boolean>(true);
   const previousModelIdRef = useRef<string>('');
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.Camera | null>(null);
 
   // 验证和处理模型路径
   useEffect(() => {
@@ -601,18 +637,116 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
     }
   }, [selectedModel]);
 
-  // 处理模型加载错误
-  const handleModelError = useCallback(() => {
-    console.error('模型加载失败，可能需要检查模型文件');
-  }, []);
+  // 捕获当前渲染视图为图片，固定尺寸为1200*1200px
+  const captureScreenshot = useCallback((): string => {
+    if (!rendererRef.current || !sceneRef.current || !cameraRef.current) return '';
+
+    // 创建一个离屏渲染器，尺寸为1200*1200
+    const offscreenRenderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      preserveDrawingBuffer: true
+    });
+    offscreenRenderer.setSize(1200, 1200);
+    offscreenRenderer.setPixelRatio(2); // 设置更高的像素比以获得更清晰的图像
+
+    // 复制当前场景和相机
+    const scene = sceneRef.current.clone();
+    const camera = cameraRef.current.clone();
+
+    // 调整相机视角以适应新的尺寸比例
+    if (camera instanceof THREE.PerspectiveCamera) {
+      // 保持视野不变，调整相机位置使模型居中
+      camera.aspect = 1; // 1:1 比例
+      camera.updateProjectionMatrix();
+
+      // 调整相机位置，确保模型完全可见
+      camera.position.z = 5; // 使用与原始相机相同的z位置
+    }
+
+    // 添加必要的光源到克隆的场景中，与SceneLighting组件保持一致
+    // 基础环境光 - 较低强度，因为我们会添加环境贴图
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+
+    // 主光源 - 提供主要方向性光照和阴影
+    const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    mainLight.position.set(10, 10, 5);
+
+    // 添加光源到场景
+    scene.add(ambientLight);
+    scene.add(mainLight);
+
+    // 注意：在实际应用中，我们应该也克隆环境贴图
+    // 但由于这里无法直接访问环境贴图，我们使用增强的光照来补偿
+    // 在实际渲染中，用户会看到带有HDR环境贴图的效果
+
+    // 设置透明背景
+    offscreenRenderer.setClearColor(0x000000, 0);
+
+    // 渲染场景
+    offscreenRenderer.render(scene, camera);
+
+    // 获取图像数据
+    const dataURL = offscreenRenderer.domElement.toDataURL('image/png');
+
+    // 清理离屏渲染器
+    offscreenRenderer.dispose();
+
+    return dataURL;
+  }, [sceneRef, cameraRef]);
+
+  // 将渲染器引用暴露给父组件
+  useEffect(() => {
+    // 将捕获截图的方法暴露给父组件
+    if (window) {
+      (window as any).captureModelScreenshot = captureScreenshot;
+    }
+
+    return () => {
+      // 清理
+      if (window && (window as any).captureModelScreenshot) {
+        delete (window as any).captureModelScreenshot;
+      }
+    };
+  }, [captureScreenshot]);
 
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full relative">
+      {/* 截图预览模式下的遮罩和指示器 */}
+      {isCapturingMode && (
+        <div className="absolute inset-0 z-20 pointer-events-none">
+          <div className="w-full h-full flex items-center justify-center">
+            {/* 中心区域保持透明，周围区域暗化 */}
+            <div className="absolute inset-0 bg-black/50"></div>
+            <div className="relative w-[80%] h-[80%] max-w-[800px] max-h-[800px] aspect-square">
+              {/* 透明区域 */}
+              <div className="absolute inset-0 border-2 border-dashed border-white/70 rounded-lg"></div>
+              {/* 移除暗化效果 */}
+              <div className="absolute inset-0 bg-transparent"></div>
+              {/* 尺寸指示 */}
+              <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-2 py-1 rounded text-xs whitespace-nowrap">
+                导出尺寸: 1200 × 1200 像素
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Canvas
         camera={{ position: [0, 0, 5], fov: 50 }}
         style={{ background: 'transparent' }}
-        gl={{ antialias: true }}
+        gl={{
+          antialias: true,
+          preserveDrawingBuffer: true, // 允许截图
+          alpha: true // 透明背景
+        }}
         dpr={[1, 2]}
+        onCreated={({ gl, scene, camera }) => {
+          // 保存渲染器、场景和相机引用
+          rendererRef.current = gl;
+          sceneRef.current = scene;
+          cameraRef.current = camera;
+        }}
       >
         <SceneLighting />
         <Suspense fallback={<LoadingIndicator progress={10} stage="初始化中" />}>
@@ -623,6 +757,7 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
               customColor={customColor}
               customRoughness={customRoughness}
               customMetallic={customMetallic}
+              autoRotate={autoRotate}
             />
           ) : (
             <DefaultModel
@@ -631,7 +766,11 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
               customMetallic={customMetallic}
             />
           )}
-          <Environment preset="city" />
+          {/* 使用本地HDR文件作为环境贴图 */}
+          <Environment
+            files="/assets/hdri/studio.hdr"
+            background={false}
+          />
           <OrbitControls
             enableZoom={true}
             enablePan={true}
@@ -642,6 +781,37 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
           />
         </Suspense>
       </Canvas>
+
+      {/* 自动旋转控制按钮 */}
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10">
+        <button
+          onClick={() => setAutoRotate(prev => !prev)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[99px] transition-colors ${
+            autoRotate
+              ? 'bg-[#2268eb] text-white hover:bg-[#2268eb]/90'
+              : 'bg-[#ffffff1a] text-[#ffffffb2] hover:bg-[#ffffff26]'
+          }`}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`${autoRotate ? 'animate-spin' : ''}`}
+            style={{ animationDuration: '3s' }}
+          >
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+          </svg>
+          <span className="text-[14px] font-[500] leading-normal">
+            {autoRotate ? '停止旋转' : '自动旋转'}
+          </span>
+        </button>
+      </div>
     </div>
   );
 };

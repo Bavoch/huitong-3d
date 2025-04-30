@@ -35,6 +35,7 @@ export const Screen = (): JSX.Element => {
   const [customColor, setCustomColor] = useState("#FFFFFF");
   const [customRoughness, setCustomRoughness] = useState(0.5);
   const [customMetallic, setCustomMetallic] = useState(0);
+  const [isCapturingMode, setIsCapturingMode] = useState(false);
 
   // 上传模型相关状态
   const [uploadedModels, setUploadedModels] = useState<Model[]>([]);
@@ -637,6 +638,59 @@ export const Screen = (): JSX.Element => {
           <Button
             variant="ghost"
             className="h-8 inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
+            onMouseEnter={() => setIsCapturingMode(true)}
+            onMouseLeave={() => setIsCapturingMode(false)}
+            onClick={() => {
+              // 使用全局暴露的方法获取截图
+              if (window && (window as any).captureModelScreenshot) {
+                const dataURL = (window as any).captureModelScreenshot();
+                if (dataURL) {
+                  // 创建一个临时的canvas元素
+                  const canvas = document.createElement('canvas');
+                  const ctx = canvas.getContext('2d');
+                  const img = new Image();
+
+                  img.onload = () => {
+                    // 设置canvas大小与图像一致
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+
+                    // 绘制图像到canvas
+                    ctx?.drawImage(img, 0, 0);
+
+                    // 将canvas内容复制到剪贴板
+                    canvas.toBlob((blob) => {
+                      if (blob) {
+                        try {
+                          // 使用Clipboard API复制图像
+                          navigator.clipboard.write([
+                            new ClipboardItem({
+                              [blob.type]: blob
+                            })
+                          ]).then(() => {
+                            alert('图片已复制到剪贴板');
+                            setIsCapturingMode(false);
+                          }).catch(err => {
+                            console.error('复制到剪贴板失败:', err);
+                            alert('复制到剪贴板失败，请检查浏览器权限');
+                            setIsCapturingMode(false);
+                          });
+                        } catch (e) {
+                          console.error('复制到剪贴板时出错:', e);
+                          alert('复制到剪贴板失败，请使用保存图片功能');
+                          setIsCapturingMode(false);
+                        }
+                      }
+                    });
+                  };
+
+                  img.src = dataURL;
+                }
+              } else {
+                alert('无法获取模型截图，请稍后再试');
+                setIsCapturingMode(false);
+              }
+            }}
           >
             <CopyIcon className="w-4 h-4 text-[#ffffffb2]" />
             <span className="text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal">
@@ -644,7 +698,30 @@ export const Screen = (): JSX.Element => {
             </span>
           </Button>
 
-          <Button className="h-8 inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-[#2268eb] rounded-lg hover:bg-[#2268eb]/90">
+          <Button
+            className="h-8 inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-[#2268eb] rounded-lg hover:bg-[#2268eb]/90"
+            onMouseEnter={() => setIsCapturingMode(true)}
+            onMouseLeave={() => setIsCapturingMode(false)}
+            onClick={() => {
+              // 使用全局暴露的方法获取截图
+              if (window && (window as any).captureModelScreenshot) {
+                const dataURL = (window as any).captureModelScreenshot();
+                if (dataURL) {
+                  // 创建下载链接
+                  const link = document.createElement('a');
+                  link.href = dataURL;
+                  link.download = `${currentModel?.name || 'model'}_${new Date().toISOString().slice(0, 10)}.png`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  setIsCapturingMode(false);
+                }
+              } else {
+                alert('无法获取模型截图，请稍后再试');
+                setIsCapturingMode(false);
+              }
+            }}
+          >
             <DownloadIcon className="w-4 h-4" />
             <span className="mt-[-1.00px] text-white w-fit text-[14px] font-[500] leading-normal">
               保存图片
@@ -664,6 +741,7 @@ export const Screen = (): JSX.Element => {
                 customColor={customColor}
                 customRoughness={customRoughness}
                 customMetallic={customMetallic}
+                isCapturingMode={isCapturingMode}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-white opacity-50">

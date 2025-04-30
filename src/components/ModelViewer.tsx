@@ -593,14 +593,70 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
     const scene = sceneRef.current.clone();
     const camera = cameraRef.current.clone();
 
-    // 调整相机视角以适应新的尺寸比例
-    if (camera instanceof THREE.PerspectiveCamera) {
-      // 保持视野不变，调整相机位置使模型居中
-      camera.aspect = 1; // 1:1 比例
-      camera.updateProjectionMatrix();
+    // 查找模型对象并计算包围盒
+    let modelBox = new THREE.Box3();
+    let hasModel = false;
 
-      // 调整相机位置，确保模型完全可见
-      camera.position.z = 5; // 使用与原始相机相同的z位置
+    // 遍历场景中的所有对象，找到包含网格的对象并计算总包围盒
+    scene.traverse((object) => {
+      if (object instanceof THREE.Mesh) {
+        hasModel = true;
+        // 扩展包围盒以包含此网格
+        modelBox.expandByObject(object);
+      }
+    });
+
+    // 如果找到模型，居中所有对象
+    if (hasModel) {
+      // 获取包围盒的中心和大小
+      const center = modelBox.getCenter(new THREE.Vector3());
+      const size = modelBox.getSize(new THREE.Vector3());
+
+      // 创建一个组来包含所有模型部分
+      const modelGroup = new THREE.Group();
+
+      // 将所有子对象移动到新组中，并调整位置
+      while (scene.children.length > 0) {
+        const child = scene.children[0];
+        scene.remove(child);
+        modelGroup.add(child);
+      }
+
+      // 调整组的位置，使模型居中
+      modelGroup.position.set(-center.x, -center.y, -center.z);
+
+      // 将组添加回场景
+      scene.add(modelGroup);
+
+      // 调整相机视角以适应新的尺寸比例和模型大小
+      if (camera instanceof THREE.PerspectiveCamera) {
+        // 设置相机比例为1:1
+        camera.aspect = 1;
+        camera.updateProjectionMatrix();
+
+        // 根据模型大小调整相机位置
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fov = camera.fov * (Math.PI / 180);
+        let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+
+        // 添加一些边距
+        cameraZ *= 1.5;
+
+        // 更新相机位置
+        camera.position.set(0, 0, cameraZ);
+
+        // 确保相机看向模型中心
+        camera.lookAt(new THREE.Vector3(0, 0, 0));
+        camera.updateProjectionMatrix();
+      }
+    } else {
+      // 如果没有找到模型，使用默认相机设置
+      if (camera instanceof THREE.PerspectiveCamera) {
+        camera.aspect = 1; // 1:1 比例
+        camera.position.set(0, 0, 5);
+        camera.lookAt(new THREE.Vector3(0, 0, 0));
+        camera.updateProjectionMatrix();
+      }
     }
 
     // 添加必要的光源到克隆的场景中，与SceneLighting组件保持一致
@@ -708,7 +764,7 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
           />
           <OrbitControls
             enableZoom={true}
-            enablePan={true}
+            enablePan={false}
             enableDamping={false}
             dampingFactor={0}
             minDistance={2}

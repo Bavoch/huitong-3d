@@ -11,7 +11,6 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
-// 移除未使用的Select相关导入
 import {
   Tabs,
   TabsContent,
@@ -20,12 +19,18 @@ import {
 } from "../../components/ui/tabs";
 import { supabase, type Model } from "../../lib/supabase";
 import ModelViewer from "../../components/ModelViewer";
+import ThumbnailGenerator from "../../components/ThumbnailGenerator";
+import ModelListItem from "../../components/ModelListItem";
 import {
   processModelFile,
   validateModelFile,
   checkFileSize,
-  getFileMimeType
+  getFileMimeType,
+  generateModelThumbnail,
+  uploadThumbnail
 } from "../../utils/modelProcessor";
+import { preloadImages } from "../../utils/imageCache";
+import { ensureModelsBucketExists, ensureThumbnailsBucketExists } from "../../utils/storageBuckets";
 
 export const Screen = (): JSX.Element => {
   const [models, setModels] = useState<Model[]>([]);
@@ -36,6 +41,8 @@ export const Screen = (): JSX.Element => {
   const [customRoughness, setCustomRoughness] = useState(0.5);
   const [customMetallic, setCustomMetallic] = useState(0);
   const [isCapturingMode, setIsCapturingMode] = useState(false);
+  const [modelsNeedingThumbnails, setModelsNeedingThumbnails] = useState<Model[]>([]);
+  const [processingThumbnails, setProcessingThumbnails] = useState(false);
 
   // 上传模型相关状态
   const [uploadedModels, setUploadedModels] = useState<Model[]>([]);
@@ -63,18 +70,9 @@ export const Screen = (): JSX.Element => {
       return;
     }
 
-    // 显示处理中的提示
-    console.log('正在处理模型文件，请稍候...');
-
     try {
       // 处理模型文件（压缩和优化）
       const { processedFile, metadata } = await processModelFile(file);
-      console.log('模型处理完成:', metadata);
-
-      // 如果有压缩，显示压缩比
-      if (metadata.compressionRatio < 1) {
-        console.log(`文件已压缩: ${(100 - metadata.compressionRatio * 100).toFixed(1)}% 的减少`);
-      }
 
       // 创建文件URL用于本地预览
       const fileURL = URL.createObjectURL(processedFile);
@@ -124,13 +122,25 @@ export const Screen = (): JSX.Element => {
           return;
         }
 
-        console.log('模型文件已上传到Supabase:', data);
-
         // 获取公共URL
         const { data: { publicUrl } } = supabase.storage.from('models').getPublicUrl(data.path);
 
         // 更新模型对象，使用存储桶URL
         newModel.file_path = publicUrl;
+
+        // 确保缩略图存储桶存在
+        await ensureThumbnailsBucketExists();
+
+        // 生成并上传缩略图
+        const thumbnailDataUrl = await generateModelThumbnail(publicUrl);
+
+        if (thumbnailDataUrl) {
+          const thumbnailUrl = await uploadThumbnail(thumbnailDataUrl, fileName);
+
+          if (thumbnailUrl) {
+            newModel.thumbnail_url = thumbnailUrl;
+          }
+        }
 
         // 添加到上传模型列表
         setUploadedModels(prev => [...prev, newModel]);
@@ -237,8 +247,6 @@ export const Screen = (): JSX.Element => {
       const storageModels = await getModelsFromStorage();
 
       if (storageModels.length > 0) {
-        // 使用从存储桶获取的模型
-        console.log('从存储桶获取到的模型:', storageModels);
         setModels(storageModels);
 
         // 如果没有当前选中的模型，选择第一个
@@ -249,9 +257,30 @@ export const Screen = (): JSX.Element => {
 
         // 同步数据库中的模型记录
         await syncModelsWithDatabase(storageModels);
+
+        // 检查哪些模型需要生成缩略图
+        const needThumbnails = storageModels.filter(model =>
+          !model.thumbnail_url ||
+          model.thumbnail_url.includes('placehold.co')
+        );
+
+        if (needThumbnails.length > 0) {
+          setModelsNeedingThumbnails(needThumbnails);
+        } else {
+          setModelsNeedingThumbnails([]);
+
+          // 预加载所有缩略图
+          const thumbnailUrls = storageModels
+            .filter(model => model.thumbnail_url && !model.thumbnail_url.includes('placehold.co'))
+            .map(model => model.thumbnail_url as string);
+
+          if (thumbnailUrls.length > 0) {
+            preloadImages(thumbnailUrls);
+          }
+        }
       } else {
-        console.log('存储桶中没有找到模型文件');
         setModels([]);
+        setModelsNeedingThumbnails([]);
       }
     } catch (error) {
       console.error('获取模型时出错:', error);
@@ -260,45 +289,7 @@ export const Screen = (): JSX.Element => {
     }
   };
 
-  // 确保models存储桶存在
-  const ensureModelsBucketExists = async () => {
-    try {
-      // 检查存储桶是否存在
-      const { data: buckets, error: bucketsError } = await supabase
-        .storage
-        .listBuckets();
 
-      if (bucketsError) {
-        console.error('获取存储桶列表错误:', bucketsError);
-        return false;
-      }
-
-      // 检查是否有名为'models'的存储桶
-      const modelsBucket = buckets.find(bucket => bucket.name === 'models');
-      if (!modelsBucket) {
-        console.log('没有找到名为"models"的存储桶，尝试创建...');
-        const { data, error } = await supabase.storage.createBucket('models', {
-          public: true,
-          fileSizeLimit: 50 * 1024 * 1024, // 50MB
-          allowedMimeTypes: ['model/gltf-binary', 'model/gltf+json', 'application/octet-stream']
-        });
-
-        if (error) {
-          console.error('创建存储桶失败:', error);
-          return false;
-        } else {
-          console.log('成功创建"models"存储桶:', data);
-          return true;
-        }
-      } else {
-        console.log('找到"models"存储桶:', modelsBucket);
-        return true;
-      }
-    } catch (error) {
-      console.error('检查/创建存储桶时出错:', error);
-      return false;
-    }
-  };
 
   // 从存储桶获取模型
   const getModelsFromStorage = async (): Promise<Model[]> => {
@@ -315,11 +306,8 @@ export const Screen = (): JSX.Element => {
       }
 
       if (!storageData || storageData.length === 0) {
-        console.log('存储桶中没有找到文件');
         return [];
       }
-
-      console.log('从存储桶获取到的文件:', storageData);
 
       // 过滤出3D模型文件
       const modelFiles = storageData.filter(file => {
@@ -328,7 +316,6 @@ export const Screen = (): JSX.Element => {
       });
 
       if (modelFiles.length === 0) {
-        console.log('存储桶中没有找到有效的3D模型文件');
         return [];
       }
 
@@ -340,11 +327,25 @@ export const Screen = (): JSX.Element => {
           .from('models')
           .getPublicUrl(file.name);
 
+        // 查询数据库中是否已有该模型的记录和缩略图
+        const { data: existingModels, error: queryError } = await supabase
+          .from('models')
+          .select('*')
+          .eq('file_path', publicUrl)
+          .limit(1);
+
+        // 如果数据库中已有记录且有缩略图，使用现有缩略图
+        let thumbnailUrl = null;
+        if (!queryError && existingModels && existingModels.length > 0 && existingModels[0].thumbnail_url) {
+          thumbnailUrl = existingModels[0].thumbnail_url;
+        }
+
         return {
           id: `storage_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
           name: file.name,
           description: `存储桶中的模型: ${file.name}`,
           file_path: publicUrl,
+          thumbnail_url: thumbnailUrl,
           created_at: file.created_at || new Date().toISOString(),
           updated_at: file.updated_at || new Date().toISOString()
         };
@@ -360,40 +361,139 @@ export const Screen = (): JSX.Element => {
   // 同步数据库中的模型记录
   const syncModelsWithDatabase = async (storageModels: Model[]) => {
     try {
-      // 首先清理数据库中的所有记录
-      const { error: deleteError } = await supabase
+      // 获取数据库中现有的模型记录
+      const { data: existingModels, error: fetchError } = await supabase
         .from('models')
-        .delete()
-        .neq('id', 0); // 删除所有记录
+        .select('*');
 
-      if (deleteError) {
-        console.error('清理数据库记录失败:', deleteError);
-      } else {
-        console.log('已清理数据库中的旧记录');
+      if (fetchError) {
+        console.error('获取现有模型记录失败:', fetchError);
+        return;
       }
 
-      // 为每个存储桶中的模型创建新记录
-      for (const model of storageModels) {
-        const { error: insertError } = await supabase
-          .from('models')
-          .insert([{
-            name: model.name,
-            description: model.description,
-            file_path: model.file_path,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }]);
+      // 创建一个映射，用于快速查找文件路径对应的现有记录
+      const existingModelMap = new Map();
+      existingModels.forEach(model => {
+        existingModelMap.set(model.file_path, model);
+      });
 
-        if (insertError) {
-          console.error(`保存模型 ${model.name} 到表中出错:`, insertError);
+      // 跟踪已处理的文件路径
+      const processedFilePaths = new Set();
+
+      // 为每个存储桶中的模型创建或更新记录
+      for (const model of storageModels) {
+        processedFilePaths.add(model.file_path);
+
+        // 检查是否已存在相同文件路径的记录
+        const existingModel = existingModelMap.get(model.file_path);
+
+        // 如果没有缩略图，尝试生成一个
+        let thumbnailUrl = model.thumbnail_url;
+        if (!thumbnailUrl && (!existingModel || !existingModel.thumbnail_url || existingModel.thumbnail_url.includes('placehold.co'))) {
+          const thumbnailDataUrl = await generateModelThumbnail(model.file_path);
+          if (thumbnailDataUrl) {
+            thumbnailUrl = await uploadThumbnail(thumbnailDataUrl, model.name);
+            if (thumbnailUrl) {
+              model.thumbnail_url = thumbnailUrl;
+            }
+          }
+        } else if (existingModel && existingModel.thumbnail_url && !existingModel.thumbnail_url.includes('placehold.co')) {
+          // 使用现有的缩略图
+          thumbnailUrl = existingModel.thumbnail_url;
+        }
+
+        if (existingModel) {
+          // 更新现有记录
+          const { error: updateError } = await supabase
+            .from('models')
+            .update({
+              name: model.name,
+              description: model.description,
+              thumbnail_url: thumbnailUrl || existingModel.thumbnail_url,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingModel.id);
+
+          if (updateError) {
+            console.error(`更新模型 ${model.name} 记录失败:`, updateError);
+          }
         } else {
-          console.log(`已将模型 ${model.name} 保存到models表`);
+          // 创建新记录
+          const { error: insertError } = await supabase
+            .from('models')
+            .insert([{
+              name: model.name,
+              description: model.description,
+              file_path: model.file_path,
+              thumbnail_url: thumbnailUrl,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }]);
+
+          if (insertError) {
+            console.error(`保存模型 ${model.name} 到表中出错:`, insertError);
+          }
+        }
+      }
+
+      // 删除存储桶中不存在的记录
+      const recordsToDelete = existingModels.filter(model => !processedFilePaths.has(model.file_path));
+
+      if (recordsToDelete.length > 0) {
+        for (const model of recordsToDelete) {
+          const { error: deleteError } = await supabase
+            .from('models')
+            .delete()
+            .eq('id', model.id);
+
+          if (deleteError) {
+            console.error(`删除模型记录 ${model.id} 失败:`, deleteError);
+          }
         }
       }
     } catch (error) {
       console.error('同步数据库记录时出错:', error);
     }
   };
+
+  // 处理缩略图生成完成事件
+  const handleThumbnailGenerated = useCallback((modelId: string, thumbnailUrl: string) => {
+    // 更新模型列表中的缩略图URL
+    setModels(prevModels =>
+      prevModels.map(model =>
+        model.id === modelId
+          ? { ...model, thumbnail_url: thumbnailUrl }
+          : model
+      )
+    );
+
+    // 从需要生成缩略图的列表中移除该模型
+    setModelsNeedingThumbnails(prevModels =>
+      prevModels.filter(model => model.id !== modelId)
+    );
+
+    // 预加载新生成的缩略图
+    if (thumbnailUrl && !thumbnailUrl.includes('placehold.co')) {
+      preloadImages([thumbnailUrl]);
+    }
+  }, []);
+
+  // 处理缩略图生成
+  const processNextThumbnail = useCallback(() => {
+    if (modelsNeedingThumbnails.length > 0 && !processingThumbnails) {
+      setProcessingThumbnails(true);
+
+      // 从列表中移除第一个模型
+      setModelsNeedingThumbnails(prevModels => prevModels.slice(1));
+    }
+  }, [modelsNeedingThumbnails, processingThumbnails]);
+
+  // 监听需要生成缩略图的模型列表变化
+  useEffect(() => {
+    if (modelsNeedingThumbnails.length > 0 && !processingThumbnails) {
+      processNextThumbnail();
+    }
+  }, [modelsNeedingThumbnails, processingThumbnails, processNextThumbnail]);
 
   // 首次加载时获取模型数据
   useEffect(() => {
@@ -425,7 +525,6 @@ export const Screen = (): JSX.Element => {
 
   // 处理分隔线上的鼠标按下事件
   const handleDividerMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    console.log('开始拖拽 - 鼠标按下事件触发');
     e.stopPropagation(); // 阻止事件冒泡
 
     // 防止文本选择
@@ -435,7 +534,6 @@ export const Screen = (): JSX.Element => {
 
     // 开始拖拽 - 设置状态会触发useEffect添加事件监听器
     setIsDragging(true);
-    console.log('isDragging 设置为 true');
 
     // 防止默认拖拽行为
     e.preventDefault();
@@ -443,16 +541,8 @@ export const Screen = (): JSX.Element => {
 
   // 处理拖拽移动
   const handleDragMove = useCallback((e: MouseEvent) => {
-    console.log('拖拽移动事件触发', '当前isDragging状态:', isDragging);
-
     // 如果不在拖拽状态或没有引用到主内容区域，则返回
-    if (!isDragging) {
-      console.log('未处于拖拽状态，忽略移动事件');
-      return;
-    }
-
-    if (!mainContentRef.current) {
-      console.log('mainContentRef不存在，忽略移动事件');
+    if (!isDragging || !mainContentRef.current) {
       return;
     }
 
@@ -460,8 +550,6 @@ export const Screen = (): JSX.Element => {
     const containerRect = mainContentRef.current.getBoundingClientRect();
     const containerWidth = containerRect.width;
     const mouseX = e.clientX - containerRect.left;
-
-    console.log('鼠标位置:', mouseX, '容器宽度:', containerWidth);
 
     // 计算新的侧边栏宽度，确保在合理范围内
     let newWidth = containerWidth - mouseX;
@@ -472,33 +560,25 @@ export const Screen = (): JSX.Element => {
 
     newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
 
-    console.log('计算的新宽度:', newWidth, '当前宽度:', sidebarWidth);
-
     // 直接设置宽度
     setSidebarWidth(newWidth);
-    console.log('已设置新宽度');
-  }, [isDragging, sidebarWidth]);
+  }, [isDragging]);
 
   // 处理拖拽结束
   const handleDragEnd = useCallback(() => {
-    console.log('拖拽结束事件触发', '当前isDragging状态:', isDragging);
-
     // 恢复样式
     document.body.style.userSelect = '';
     document.body.style.cursor = '';
-    console.log('已恢复样式');
 
     // 设置拖拽状态为false - 会触发useEffect移除事件监听器
     setIsDragging(false);
-    console.log('isDragging 设置为 false');
-  }, [isDragging]);
+  }, []);
 
   // 全局事件处理器，确保在任何情况下都能正确清理
   useEffect(() => {
     // 添加全局鼠标抬起事件处理器，作为安全措施
     const handleGlobalMouseUp = () => {
       if (isDragging) {
-        console.log('全局鼠标抬起事件触发，强制结束拖拽');
         handleDragEnd();
       }
     };
@@ -506,7 +586,6 @@ export const Screen = (): JSX.Element => {
     // 添加全局按键事件处理器，按ESC键结束拖拽
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isDragging) {
-        console.log('ESC键按下，强制结束拖拽');
         handleDragEnd();
       }
     };
@@ -526,16 +605,12 @@ export const Screen = (): JSX.Element => {
 
   // 监听isDragging状态变化
   useEffect(() => {
-    console.log('isDragging状态变化:', isDragging);
-
     if (isDragging) {
-      console.log('进入拖拽状态，添加事件监听器');
       document.addEventListener('mousemove', handleDragMove);
       document.addEventListener('mouseup', handleDragEnd);
 
       // 清理函数，组件卸载或依赖项变化时执行
       return () => {
-        console.log('清理事件监听器');
         document.removeEventListener('mousemove', handleDragMove);
         document.removeEventListener('mouseup', handleDragEnd);
       };
@@ -601,14 +676,6 @@ export const Screen = (): JSX.Element => {
         const headerHeight = 64; // 头部高度 + padding
         const contentHeight = windowHeight - headerHeight;
         mainContentRef.current.style.height = `${contentHeight}px`;
-
-        console.log('窗口调整:', {
-          windowHeight,
-          headerHeight,
-          contentHeight,
-          mainContentWidth: mainContentRef.current.offsetWidth,
-          sidebarWidth
-        });
       }
     };
 
@@ -780,7 +847,7 @@ export const Screen = (): JSX.Element => {
         <Card
           className="flex flex-col items-start gap-4 p-3 relative bg-[#ffffff0d] rounded-2xl border-0 h-full overflow-hidden"
           style={{ width: `${sidebarWidth}px` }}>
-          <CardContent className="p-0 space-y-4 w-full h-full overflow-y-auto scrollbar-thin scrollbar-thumb-[#3a3a3a] scrollbar-track-transparent max-w-full">
+          <CardContent className="p-0 space-y-4 w-full h-full overflow-y-auto scrollbar-thin scrollbar-thumb-[#3a3a3a] scrollbar-track-transparent max-w-full flex flex-col">
             {/* Model Selection Section */}
             <div className="flex flex-col items-start gap-2 relative self-stretch w-full">
               <div className="inline-flex items-center gap-1 relative">
@@ -803,48 +870,24 @@ export const Screen = (): JSX.Element => {
                   <>
                     {/* 根据状态显示上传的模型或内置模型 */}
                     {(showUploadedModels ? uploadedModels : models).map((model) => (
-                      <div
+                      <ModelListItem
                         key={model.id}
-                        className={`flex items-center justify-between p-2 my-1 rounded-lg cursor-pointer transition-colors duration-150 w-full ${selectedModel === model.id ? 'bg-[#2268eb] text-white' : 'bg-[#2a2a2a] text-[#ffffffe6] hover:bg-[#3a3a3a]'}`}
-                        onClick={() => {
-                          console.log('选择模型:', model);
+                        model={model}
+                        isSelected={selectedModel === model.id}
+                        onSelect={(modelId) => {
                           // 先清除当前模型，然后设置新模型，确保状态更新
                           setCurrentModel(null);
                           setSelectedModel('');
 
                           // 使用setTimeout确保状态更新后再设置新模型
                           setTimeout(() => {
-                            setSelectedModel(model.id);
+                            setSelectedModel(modelId);
                             setCurrentModel(model);
-                            console.log('当前选中的模型:', model);
                           }, 50);
                         }}
-                      >
-                        <div className="flex items-center gap-2 overflow-hidden max-w-[calc(100%-28px)] flex-1">
-                          <div className="w-6 h-6 flex-shrink-0 bg-[#ffffff1a] rounded-md flex items-center justify-center">
-                            <BoxIcon className="w-4 h-4" />
-                          </div>
-                          <span className="text-[14px] font-[500] truncate min-w-0 flex-1">{model.name}</span>
-                        </div>
-
-                        {/* 删除按钮，只对上传的模型显示 */}
-                        {showUploadedModels && (
-                          <button
-                            className={`p-1 rounded-md flex-shrink-0 ${selectedModel === model.id ? 'hover:bg-[#4b83f0] text-white' : 'hover:bg-[#ffffff1a] text-[#ffffff80]'}`}
-                            onClick={(e) => {
-                              e.stopPropagation(); // 阻止事件冒泡到父元素
-                              deleteUploadedModel(model.id);
-                            }}
-                            title="删除模型"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
-                              <path d="M3 6h18"></path>
-                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                            </svg>
-                          </button>
-                        )}
-                      </div>
+                        onDelete={showUploadedModels ? deleteUploadedModel : undefined}
+                        showDeleteButton={showUploadedModels}
+                      />
                     ))}
 
                     {/* 当没有模型时显示提示 */}
@@ -931,7 +974,7 @@ export const Screen = (): JSX.Element => {
             </div>
 
             {/* Material Settings Section */}
-            <div className="flex flex-col items-start gap-2 relative flex-1 self-stretch w-full grow">
+            <div className="flex flex-col items-start gap-2 relative flex-1 self-stretch w-full">
               <div className="inline-flex items-center gap-1 relative">
                 <ShirtIcon className="w-4 h-4 text-[#ffffffb2]" />
                 <span className="text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal">
@@ -971,7 +1014,7 @@ export const Screen = (): JSX.Element => {
               </div>
 
               {/* Material Type Tabs */}
-              <Tabs defaultValue="standard" className="w-full">
+              <Tabs defaultValue="standard" className="w-full flex-1 flex flex-col">
                 <TabsList className="h-9 p-1 w-full bg-[#ffffff0d] rounded-lg grid grid-cols-2">
                   <TabsTrigger
                     value="standard"
@@ -987,8 +1030,8 @@ export const Screen = (): JSX.Element => {
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="standard" className="mt-3 p-0">
-                  <div className="flex flex-col items-start gap-3 relative flex-1 self-stretch w-full grow rounded-2xl">
+                <TabsContent value="standard" className="mt-3 p-0 flex-1 flex flex-col">
+                  <div className="flex flex-col items-start gap-3 relative flex-1 self-stretch w-full rounded-2xl">
                     {/* Search Input */}
                     <div className="flex items-center gap-1 px-2 py-1.5 relative self-stretch w-full bg-[#00000026] rounded-lg overflow-hidden">
                       <SearchIcon className="w-4 h-4 text-[#ffffff66]" />
@@ -999,7 +1042,7 @@ export const Screen = (): JSX.Element => {
                     </div>
 
                     {/* Material Grid */}
-                    <div className="flex flex-wrap w-full items-start gap-[8px] relative flex-1 max-h-[30vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[#3a3a3a] scrollbar-track-transparent">
+                    <div className="flex flex-wrap w-full items-start content-start gap-[8px] relative flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-[#3a3a3a] scrollbar-track-transparent">
                       {materials.map((material) => (
                         <div
                           key={material.id}
@@ -1097,6 +1140,17 @@ export const Screen = (): JSX.Element => {
           </CardContent>
         </Card>
       </div>
+
+      {/* 缩略图生成器 - 不可见组件 */}
+      {processingThumbnails && modelsNeedingThumbnails.length > 0 && (
+        <ThumbnailGenerator
+          model={modelsNeedingThumbnails[0]}
+          onThumbnailGenerated={(thumbnailUrl) => {
+            handleThumbnailGenerated(modelsNeedingThumbnails[0].id, thumbnailUrl);
+            setProcessingThumbnails(false);
+          }}
+        />
+      )}
     </main>
   );
 };

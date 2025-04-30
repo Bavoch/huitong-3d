@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, Suspense, useCallback } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, useGLTF, Html, Text, Environment } from '@react-three/drei';
+import { OrbitControls, useGLTF, Html, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { type Model } from '../lib/supabase';
 
@@ -32,26 +32,10 @@ function LoadingIndicator({ progress = 0, stage = '准备中' }: { progress?: nu
   );
 }
 
-// 错误显示组件
-function ErrorDisplay() {
-  return (
-    <mesh position={[0, 0, 0]}>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color="red" />
-    </mesh>
-  );
-}
+
 
 // 默认模型组件 - 当没有实际模型时显示
-function DefaultModel({
-  customColor,
-  customRoughness,
-  customMetallic
-}: {
-  customColor: string;
-  customRoughness: number;
-  customMetallic: number;
-}) {
+function DefaultModel() {
   return (
     <group>
       {/* 简单的文字提示 */}
@@ -88,8 +72,6 @@ function ModelLoader({
 
   // 尝试加载模型
   useEffect(() => {
-    console.log('ModelLoader - 尝试加载模型:', modelPath);
-
     // 检查模型路径是否变化
     const isPathChanged = previousPathRef.current !== modelPath;
     previousPathRef.current = modelPath;
@@ -101,7 +83,6 @@ function ModelLoader({
 
     // 如果没有提供模型路径，使用默认模型
     if (!modelPath) {
-      console.log('没有提供模型路径，使用默认模型');
       setUseDefaultModel(true);
       return;
     }
@@ -115,17 +96,13 @@ function ModelLoader({
     setModelKey(`${modelPath}_${Date.now()}_attempt_${loadAttempts}`);
 
     // 检查模型路径是否为Blob URL（上传的文件）
-    if (modelPath.startsWith('blob:')) {
-      console.log('加载上传的模型文件:', modelPath);
-    } else {
+    if (!modelPath.startsWith('blob:')) {
       // 对于非Blob URL，检查路径是否有效
       try {
         const url = new URL(modelPath);
-        console.log('模型URL有效:', url.toString());
 
         // 检查文件扩展名
         const fileExtension = url.pathname.split('.').pop()?.toLowerCase();
-        console.log('文件扩展名:', fileExtension);
 
         if (!['glb', 'gltf'].includes(fileExtension || '')) {
           console.error('不支持的文件格式:', fileExtension);
@@ -133,12 +110,8 @@ function ModelLoader({
           setUseDefaultModel(true);
           return;
         }
-
-        // 不再使用HEAD请求检查URL可访问性，因为某些CDN可能不支持
-        // 直接让Three.js的加载器尝试加载模型
-        console.log('将尝试直接加载模型:', url.toString());
       } catch (e) {
-        console.error('模型路径无效:', modelPath, e);
+        console.error('模型路径无效:', modelPath);
         setUseDefaultModel(true);
         return;
       }
@@ -178,11 +151,7 @@ function ModelLoader({
   if (useDefaultModel || error) {
     return (
       <group ref={groupRef}>
-        <DefaultModel
-          customColor={customColor}
-          customRoughness={customRoughness}
-          customMetallic={customMetallic}
-        />
+        <DefaultModel />
         {error && (
           <Html position={[0, -1.5, 0]} center>
             <div className="bg-black/70 text-white px-4 py-2 rounded-md text-center">
@@ -242,14 +211,9 @@ function ModelObject({
   const cleanupResources = useCallback(() => {
     if (currentModelPath) {
       try {
-        // 从缓存中移除模型
-        useGLTF.dispose(currentModelPath);
-        console.log('已从缓存中移除模型:', currentModelPath);
-
         // 如果是Blob URL，释放它
         if (currentModelPath.startsWith('blob:')) {
           URL.revokeObjectURL(currentModelPath);
-          console.log('已释放Blob URL:', currentModelPath);
         }
       } catch (e) {
         console.warn('清理资源失败:', e);
@@ -285,12 +249,10 @@ function ModelObject({
   // 使用useEffect来处理模型加载和错误
   useEffect(() => {
     let isMounted = true;
-    let loadingTimeout: number | null = null;
+    let loadingTimeout: ReturnType<typeof setTimeout> | null = null;
 
     // 如果模型路径发生变化，清除当前模型场景和资源
     if (currentModelPath !== modelPath) {
-      console.log('模型路径已变更，清除当前模型场景');
-
       // 清理之前的资源
       cleanupResources();
 
@@ -313,7 +275,6 @@ function ModelObject({
     }, 15000); // 15秒超时
 
     const loadModel = async () => {
-      console.log('开始加载模型:', modelPath);
 
       // 创建自定义加载器以跟踪进度
       const createProgressTracker = (url: string) => {
@@ -321,12 +282,11 @@ function ModelObject({
           // 使用 THREE.js 的加载管理器跟踪加载进度
           const manager = new THREE.LoadingManager();
 
-          manager.onProgress = (url, loaded, total) => {
+          manager.onProgress = (_, loaded, total) => {
             if (isMounted) {
               const progress = Math.min(Math.round((loaded / total) * 80), 80); // 下载阶段占80%
               setLoadProgress(progress);
               setLoadStage('下载中');
-              console.log(`模型下载进度: ${progress}%`);
             }
           };
 
@@ -341,7 +301,7 @@ function ModelObject({
           // 开始加载
           loader.load(
             url,
-            (data) => {
+            (_) => {
               // 清除超时
               clearTimeout(timeoutId);
 
@@ -383,16 +343,6 @@ function ModelObject({
 
       // 跳过HEAD请求检查，直接尝试加载模型
       try {
-        // 检查模型路径是否为GLB格式
-        const isGlb = modelPath.toLowerCase().endsWith('.glb');
-        console.log('模型格式:', isGlb ? 'GLB' : 'GLTF');
-
-        // 清除之前的缓存
-        try {
-          useGLTF.dispose(modelPath);
-        } catch (e) {
-          console.warn('清除缓存失败，可能是首次加载此模型');
-        }
 
         // 使用进度跟踪器加载模型
         let gltfScene;
@@ -401,7 +351,7 @@ function ModelObject({
         if (modelPath.startsWith('blob:')) {
           setLoadStage('加载本地文件');
           useGLTF.preload(modelPath);
-          const gltf = await useGLTF(modelPath);
+          const gltf = useGLTF(modelPath);
           gltfScene = gltf.scene;
           setLoadProgress(90);
         } else {
@@ -516,8 +466,6 @@ function ModelObject({
   useEffect(() => {
     // 如果模型已加载，更新材质
     if (modelScene) {
-      console.log('材质属性变化，更新模型材质:', { customColor, customRoughness, customMetallic });
-
       // 创建新的材质
       const material = new THREE.MeshStandardMaterial({
         color: new THREE.Color(customColor),
@@ -575,7 +523,6 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
   customMetallic,
   isCapturingMode = false
 }) => {
-  console.log('渲染ModelViewer组件，选中的模型:', selectedModel);
   const [modelViewKey, setModelViewKey] = useState<string>('');
   const [modelValid, setModelValid] = useState<boolean>(true);
   const [modelPath, setModelPath] = useState<string>('');
@@ -588,11 +535,6 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
   // 验证和处理模型路径
   useEffect(() => {
     if (selectedModel) {
-      console.log('ModelViewer - 当前模型详情:');
-      console.log('ID:', selectedModel.id);
-      console.log('名称:', selectedModel.name);
-      console.log('文件路径:', selectedModel.file_path);
-
       // 检查模型是否变化
       const modelChanged = previousModelIdRef.current !== selectedModel.id;
       previousModelIdRef.current = selectedModel.id;
@@ -600,11 +542,9 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
       // 验证文件路径
       try {
         const url = new URL(selectedModel.file_path);
-        console.log('文件URL有效:', url.toString());
 
         // 检查文件扩展名
         const fileExtension = url.pathname.split('.').pop()?.toLowerCase();
-        console.log('文件扩展名:', fileExtension);
 
         // 检查是否为支持的格式
         const isValidFormat = ['glb', 'gltf'].includes(fileExtension || '');
@@ -627,11 +567,10 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
           setModelValid(false);
         }
       } catch (e) {
-        console.error('文件路径无效:', selectedModel.file_path, e);
+        console.error('文件路径无效:', selectedModel.file_path);
         setModelValid(false);
       }
     } else {
-      console.log('ModelViewer - 没有选中的模型');
       setModelPath('');
       setModelValid(true);
     }
@@ -760,11 +699,7 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
               autoRotate={autoRotate}
             />
           ) : (
-            <DefaultModel
-              customColor={customColor}
-              customRoughness={customRoughness}
-              customMetallic={customMetallic}
-            />
+            <DefaultModel />
           )}
           {/* 使用本地HDR文件作为环境贴图 */}
           <Environment

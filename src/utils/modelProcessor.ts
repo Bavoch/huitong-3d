@@ -4,7 +4,10 @@
  */
 
 import * as THREE from 'three';
-import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { supabase } from '../lib/supabase';
+import { ensureThumbnailsBucketExists } from './storageBuckets';
 
 /**
  * 检查文件大小，如果超过限制，返回 false
@@ -33,7 +36,8 @@ export const getFileMimeType = (file: File): string => {
 };
 
 /**
- * 处理模型文件，进行基本的优化
+ * 处理模型文件
+ * 注意：当前版本直接返回原始文件，未实现实际压缩
  * @param file 模型文件
  * @returns 处理后的文件和元数据
  */
@@ -48,80 +52,20 @@ export const processModelFile = async (file: File): Promise<{
 }> => {
   // 获取文件扩展名
   const fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
-  
-  // 如果不是 GLB/GLTF 格式，直接返回原文件
-  if (!['glb', 'gltf'].includes(fileExtension)) {
-    return {
-      processedFile: file,
-      metadata: {
-        originalSize: file.size,
-        processedSize: file.size,
-        compressionRatio: 1,
-        format: fileExtension
-      }
-    };
-  }
 
-  // 对于小文件（小于 2MB），直接返回原文件
-  if (file.size < 2 * 1024 * 1024) {
-    return {
-      processedFile: file,
-      metadata: {
-        originalSize: file.size,
-        processedSize: file.size,
-        compressionRatio: 1,
-        format: fileExtension
-      }
-    };
-  }
-
-  try {
-    // 创建文件的 URL
-    const fileURL = URL.createObjectURL(file);
-    
-    // 记录原始大小
-    const originalSize = file.size;
-    
-    // 这里我们只进行基本的处理
-    // 实际项目中可以使用 Draco 压缩或其他高级技术
-    
-    // 创建一个新的文件名，添加处理标记
-    const fileName = file.name.replace(`.${fileExtension}`, `_processed.${fileExtension}`);
-    
-    // 创建处理后的文件
-    // 注意：这里只是示例，实际上没有进行真正的压缩
-    // 在实际项目中，可以使用 Draco 压缩或其他技术
-    const processedFile = new File([file], fileName, {
-      type: getFileMimeType(file)
-    });
-    
-    // 释放 URL
-    URL.revokeObjectURL(fileURL);
-    
-    return {
-      processedFile,
-      metadata: {
-        originalSize,
-        processedSize: processedFile.size,
-        compressionRatio: processedFile.size / originalSize,
-        format: fileExtension
-      }
-    };
-  } catch (error) {
-    console.error('处理模型文件时出错:', error);
-    
-    // 如果处理失败，返回原始文件
-    return {
-      processedFile: file,
-      metadata: {
-        originalSize: file.size,
-        processedSize: file.size,
-        compressionRatio: 1,
-        format: fileExtension
-      }
-    };
-  }
+  // 返回原始文件和元数据
+  return {
+    processedFile: file,
+    metadata: {
+      originalSize: file.size,
+      processedSize: file.size,
+      compressionRatio: 1,
+      format: fileExtension
+    }
+  };
 };
+
+
 
 /**
  * 生成模型的缩略图
@@ -130,43 +74,171 @@ export const processModelFile = async (file: File): Promise<{
  * @returns 缩略图的 Data URL
  */
 export const generateModelThumbnail = async (modelUrl: string): Promise<string | null> => {
+  return new Promise((resolve) => {
+    try {
+      // 创建一个临时的 DOM 元素来挂载渲染器
+      const container = document.createElement('div');
+      container.style.position = 'absolute';
+      container.style.left = '-9999px';
+      container.style.top = '-9999px';
+      document.body.appendChild(container);
+
+      // 创建场景
+      const scene = new THREE.Scene();
+      scene.background = null; // 透明背景
+
+      // 创建相机
+      const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+      camera.position.set(0, 0, 5);
+
+      // 添加光源
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+      scene.add(ambientLight);
+
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(1, 1, 1);
+      scene.add(directionalLight);
+
+      // 创建渲染器
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        preserveDrawingBuffer: true
+      });
+      renderer.setSize(256, 256);
+      renderer.setClearColor(0x000000, 0); // 透明背景
+      container.appendChild(renderer.domElement);
+
+      // 创建控制器
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.25;
+      controls.screenSpacePanning = false;
+      controls.maxPolarAngle = Math.PI / 2;
+
+      // 加载模型
+      const loader = new GLTFLoader();
+
+      // 设置加载超时
+      const timeoutId = setTimeout(() => {
+        cleanup();
+        resolve(null);
+      }, 10000); // 10秒超时
+
+      loader.load(
+        modelUrl,
+        (gltf) => {
+          clearTimeout(timeoutId);
+
+          const model = gltf.scene;
+
+          // 计算包围盒并居中模型
+          const box = new THREE.Box3().setFromObject(model);
+          const center = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
+
+          // 重置模型位置到中心
+          model.position.x = -center.x;
+          model.position.y = -center.y;
+          model.position.z = -center.z;
+
+          // 调整相机位置以适应模型大小
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const fov = camera.fov * (Math.PI / 180);
+          let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+
+          // 添加一些边距
+          cameraZ *= 1.5;
+
+          // 更新相机位置
+          camera.position.z = cameraZ;
+
+          // 确保相机看向模型中心
+          camera.lookAt(new THREE.Vector3(0, 0, 0));
+          camera.updateProjectionMatrix();
+
+          // 添加模型到场景
+          scene.add(model);
+
+          // 渲染场景
+          renderer.render(scene, camera);
+
+          // 获取缩略图
+          const dataUrl = renderer.domElement.toDataURL('image/png');
+
+          // 清理资源
+          cleanup();
+
+          resolve(dataUrl);
+        },
+        undefined,
+        (error) => {
+          // 加载错误
+          clearTimeout(timeoutId);
+          cleanup();
+          resolve(null);
+        }
+      );
+
+      // 清理函数
+      function cleanup() {
+        if (container && container.parentNode) {
+          container.parentNode.removeChild(container);
+        }
+        if (renderer) {
+          renderer.dispose();
+        }
+        if (controls) {
+          controls.dispose();
+        }
+      }
+
+    } catch (error) {
+      resolve(null);
+    }
+  });
+};
+
+/**
+ * 上传缩略图到Supabase存储
+ * @param thumbnailDataUrl 缩略图的Data URL
+ * @param modelName 模型名称，用于生成缩略图文件名
+ * @returns 缩略图的公共URL，如果上传失败则返回null
+ */
+export const uploadThumbnail = async (thumbnailDataUrl: string, modelName: string): Promise<string | null> => {
   try {
-    // 创建一个临时的 Three.js 场景
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-    camera.position.set(0, 0, 5);
-    
-    // 添加光源
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-    scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(1, 1, 1);
-    scene.add(directionalLight);
-    
-    // 创建渲染器
-    const renderer = new THREE.WebGLRenderer({ 
-      antialias: true,
-      alpha: true,
-      preserveDrawingBuffer: true
-    });
-    renderer.setSize(256, 256);
-    
-    // 加载模型
-    // 注意：这里需要使用实际的 GLTFLoader，但为了简化示例，我们只返回 null
-    // 在实际项目中，应该使用 GLTFLoader 加载模型并渲染
-    
-    // 渲染场景
-    renderer.render(scene, camera);
-    
-    // 获取缩略图
-    const dataUrl = renderer.domElement.toDataURL('image/png');
-    
-    // 清理资源
-    renderer.dispose();
-    
-    return dataUrl;
+    // 确保thumbnails存储桶存在
+    const bucketExists = await ensureThumbnailsBucketExists();
+    if (!bucketExists) {
+      return null;
+    }
+
+    // 从Data URL创建Blob
+    const response = await fetch(thumbnailDataUrl);
+    const blob = await response.blob();
+
+    // 生成唯一的文件名
+    const fileName = `${Date.now()}_${modelName.replace(/\.[^/.]+$/, '')}_thumbnail.png`;
+
+    // 上传到Supabase
+    const { data, error } = await supabase.storage
+      .from('thumbnails')
+      .upload(fileName, blob, {
+        contentType: 'image/png',
+        upsert: false
+      });
+
+    if (error) {
+      return null;
+    }
+
+    // 获取公共URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('thumbnails')
+      .getPublicUrl(data.path);
+
+    return publicUrl;
   } catch (error) {
-    console.error('生成模型缩略图时出错:', error);
     return null;
   }
 };
@@ -182,18 +254,18 @@ export const validateModelFile = async (file: File): Promise<boolean> => {
   if (!['glb', 'gltf', 'obj', 'fbx'].includes(fileExtension)) {
     return false;
   }
-  
+
   // 检查文件大小
   if (!checkFileSize(file, 50)) {
     return false;
   }
-  
+
   // 对于 GLB/GLTF 文件，可以尝试解析头部
   if (['glb', 'gltf'].includes(fileExtension)) {
     try {
       // 读取文件的前几个字节
       const buffer = await file.arrayBuffer();
-      
+
       // 对于 GLB 文件，检查魔数
       if (fileExtension === 'glb') {
         const view = new DataView(buffer);
@@ -203,7 +275,7 @@ export const validateModelFile = async (file: File): Promise<boolean> => {
           return false;
         }
       }
-      
+
       // 对于 GLTF 文件，尝试解析 JSON
       if (fileExtension === 'gltf') {
         const text = await file.text();
@@ -216,13 +288,13 @@ export const validateModelFile = async (file: File): Promise<boolean> => {
           return false;
         }
       }
-      
+
       return true;
     } catch {
       return false;
     }
   }
-  
+
   // 对于其他格式，我们只能基于扩展名和大小进行基本验证
   return true;
 };

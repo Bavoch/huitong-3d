@@ -40,6 +40,31 @@ export const Screen = (): JSX.Element => {
   const [customMetallic, setCustomMetallic] = useState(0);
   const [modelsNeedingThumbnails, setModelsNeedingThumbnails] = useState<Model[]>([]);
   const [processingThumbnails, setProcessingThumbnails] = useState(false);
+  const [clickCount, setClickCount] = useState(0);
+  const clickTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // 处理logo点击事件
+  const handleLogoClick = useCallback(() => {
+    // 清除之前的计时器
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+    }
+    
+    // 增加点击计数
+    const newCount = clickCount + 1;
+    setClickCount(newCount);
+    
+    // 设置超时重置计数（1秒内点击三次）
+    clickTimeoutRef.current = setTimeout(() => {
+      setClickCount(0);
+    }, 1000);
+    
+    // 如果点击了三次，跳转到管理后台
+    if (newCount >= 3) {
+      setClickCount(0);
+      window.location.href = '/admin';
+    }
+  }, [clickCount]);
 
   // 上传模型相关状态
   const [uploadedModels, setUploadedModels] = useState<Model[]>([]);
@@ -526,9 +551,12 @@ export const Screen = (): JSX.Element => {
       {/* Header */}
       <header className="flex items-center justify-between pl-2 pr-0 py-0 relative self-stretch w-full flex-shrink-0">
         <img
-          className="relative w-[78px] h-6 object-contain"
+          className="relative w-[78px] h-6 object-contain cursor-pointer"
           alt="Logo"
           src="/Logo.png"
+          onClick={handleLogoClick}
+          title="点击三次进入管理后台"
+          style={{ cursor: 'pointer' }}
         />
 
         <div className="inline-flex items-center justify-end gap-2 relative">

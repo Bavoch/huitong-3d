@@ -13,11 +13,8 @@ interface ModelThumbnailProps {
  * 使用缓存机制避免重复加载缩略图
  */
 const ModelThumbnail: React.FC<ModelThumbnailProps> = ({ id, thumbnailUrl, className = '' }) => {
-  // 使用状态来跟踪图片是否加载完成
   const [isLoaded, setIsLoaded] = useState(false);
-  // 使用状态来存储实际显示的URL
   const [displayUrl, setDisplayUrl] = useState<string | null>(null);
-  // 使用状态来跟踪图片是否加载失败
   const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
@@ -45,11 +42,9 @@ const ModelThumbnail: React.FC<ModelThumbnailProps> = ({ id, thumbnailUrl, class
     // 预加载图片
     preloadImage(thumbnailUrl).then(success => {
       if (success) {
-        // 加载成功，缓存URL
         cacheImageUrl(id, thumbnailUrl);
         setIsLoaded(true);
       } else {
-        // 加载失败
         setLoadError(true);
       }
     });
@@ -64,12 +59,11 @@ const ModelThumbnail: React.FC<ModelThumbnailProps> = ({ id, thumbnailUrl, class
     );
   }
 
-  // 使用img标签而不是背景图片，以便浏览器可以更好地缓存
   return (
     <div className={`w-8 h-8 flex-shrink-0 bg-[#ffffff1a] rounded-md flex items-center justify-center overflow-hidden ${className}`}>
-      <img 
-        src={displayUrl} 
-        alt="模型缩略图" 
+      <img
+        src={displayUrl}
+        alt="模型缩略图"
         className={`w-full h-full object-cover transition-opacity duration-200 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
         onLoad={() => setIsLoaded(true)}
         onError={() => setLoadError(true)}
@@ -79,5 +73,4 @@ const ModelThumbnail: React.FC<ModelThumbnailProps> = ({ id, thumbnailUrl, class
   );
 };
 
-// 使用React.memo包装组件，避免不必要的重新渲染
 export default memo(ModelThumbnail);

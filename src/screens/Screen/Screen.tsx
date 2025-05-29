@@ -7,7 +7,7 @@ import {
   ShirtIcon,
   UploadIcon,
 } from "lucide-react";
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
@@ -17,20 +17,18 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/tabs";
-import { supabase, type Model } from "../../lib/supabase";
+import { getModels, saveModel, deleteModel, updateModelThumbnail, type Model } from "../../lib/localStorage";
 import ModelViewer from "../../components/ModelViewer";
 import ThumbnailGenerator from "../../components/ThumbnailGenerator";
-import ModelListItem from "../../components/ModelListItem";
+import ModelSelect from "../../components/ModelSelect";
 import {
   processModelFile,
   validateModelFile,
   checkFileSize,
-  getFileMimeType,
   generateModelThumbnail,
-  uploadThumbnail
 } from "../../utils/modelProcessor";
 import { preloadImages } from "../../utils/imageCache";
-import { ensureModelsBucketExists, ensureThumbnailsBucketExists } from "../../utils/storageBuckets";
+import { ensureModelsBucketExists } from "../../utils/storageBuckets";
 
 export const Screen = (): JSX.Element => {
   const [models, setModels] = useState<Model[]>([]);
@@ -40,7 +38,6 @@ export const Screen = (): JSX.Element => {
   const [customColor, setCustomColor] = useState("#FFFFFF");
   const [customRoughness, setCustomRoughness] = useState(0.5);
   const [customMetallic, setCustomMetallic] = useState(0);
-  const [isCapturingMode, setIsCapturingMode] = useState(false);
   const [modelsNeedingThumbnails, setModelsNeedingThumbnails] = useState<Model[]>([]);
   const [processingThumbnails, setProcessingThumbnails] = useState(false);
 
@@ -91,57 +88,27 @@ export const Screen = (): JSX.Element => {
       // 确保存储桶存在
       await ensureModelsBucketExists();
 
-      // 上传文件到Supabase存储桶
+      // 保存文件到本地存储
       try {
-        // 设置正确的MIME类型
-        const contentType = getFileMimeType(processedFile instanceof File ? processedFile : file);
+        // 使用已创建的本地URL作为文件路径
+        const publicUrl = fileURL;
+        
+        // 文件路径已经在创建模型时设置为fileURL
 
-        // 生成唯一文件名，避免覆盖
-        const uniqueFileName = `${Date.now()}_${fileName}`;
-
-        // 上传文件到Supabase存储桶
-        const { data, error } = await supabase.storage
-          .from('models')
-          .upload(uniqueFileName, processedFile, {
-            contentType,
-            upsert: false // 不覆盖同名文件
-          });
-
-        if (error) {
-          console.error('上传到Supabase失败:', error);
-          alert('上传模型到存储桶失败，请稍后重试');
-
-          // 清理本地资源
-          URL.revokeObjectURL(fileURL);
-
-          // 清空文件输入，允许再次上传
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
-
-          return;
-        }
-
-        // 获取公共URL
-        const { data: { publicUrl } } = supabase.storage.from('models').getPublicUrl(data.path);
-
-        // 更新模型对象，使用存储桶URL
+        // 保持使用已创建的本地URL
         newModel.file_path = publicUrl;
 
-        // 确保缩略图存储桶存在
-        await ensureThumbnailsBucketExists();
-
-        // 生成并上传缩略图
+        // 生成缩略图
         const thumbnailDataUrl = await generateModelThumbnail(publicUrl);
 
         if (thumbnailDataUrl) {
-          const thumbnailUrl = await uploadThumbnail(thumbnailDataUrl, fileName);
-
-          if (thumbnailUrl) {
-            newModel.thumbnail_url = thumbnailUrl;
-          }
+          // 直接将缩略图数据URL保存到模型对象中
+          newModel.thumbnail_url = thumbnailDataUrl;
         }
 
+        // 将模型保存到本地存储
+        saveModel(newModel);
+        
         // 添加到上传模型列表
         setUploadedModels(prev => [...prev, newModel]);
 
@@ -149,11 +116,11 @@ export const Screen = (): JSX.Element => {
         setSelectedModel(newModel.id);
         setCurrentModel(newModel);
 
-        // 重新获取所有模型，确保数据库和存储桶同步
+        // 重新获取所有模型
         fetchModels();
 
         // 显示成功消息
-        console.log('模型上传成功，已添加到存储桶');
+        // 模型上传成功
       } catch (uploadError) {
         console.error('上传过程中出错:', uploadError);
         alert('上传过程中出错，请稍后重试');
@@ -175,16 +142,19 @@ export const Screen = (): JSX.Element => {
   // 删除单个上传的模型
   const deleteUploadedModel = (modelId: string) => {
     // 找到要删除的模型
-    const modelToDelete = uploadedModels.find(m => m.id === modelId);
+    const modelToDelete = uploadedModels.find(model => model.id === modelId);
     if (!modelToDelete) return;
 
-    // 释放对象URL
+    // 如果是记忆URL，释放内存
     if (modelToDelete.file_path.startsWith('blob:')) {
       URL.revokeObjectURL(modelToDelete.file_path);
     }
-
-    // 从列表中移除模型
-    setUploadedModels(prev => prev.filter(m => m.id !== modelId));
+    if (modelToDelete.thumbnail_url?.startsWith('blob:')) {
+      URL.revokeObjectURL(modelToDelete.thumbnail_url);
+    }
+    
+    // 使用本地存储删除模型
+    deleteModel(modelId);
 
     // 如果删除的是当前选中的模型，选择另一个模型
     if (modelId === selectedModel) {
@@ -236,41 +206,59 @@ export const Screen = (): JSX.Element => {
     }
   };
 
-  // 从 Supabase 获取模型数据
+  // 从本地存储获取模型数据
   const fetchModels = async () => {
     setLoading(true);
     try {
-      // 检查存储桶是否存在，如果不存在则创建
+      // 检查存储桶是否存在，对于本地存储来说总是存在的
       await ensureModelsBucketExists();
 
-      // 从存储桶获取模型文件
-      const storageModels = await getModelsFromStorage();
-
-      if (storageModels.length > 0) {
-        setModels(storageModels);
+      // 从本地存储获取模型
+      let localModels = getModels();
+      
+      // 如果本地存储中没有模型，添加默认的 duck.glb 模型
+      if (localModels.length === 0) {
+        const defaultModel: Model = {
+          id: 'default-duck',
+          name: '示例鸭子',
+          file_path: '/duck.glb',
+          description: '默认的示例鸭子模型',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          thumbnail_url: '/duck-thumbnail.jpg'
+        };
+        
+        // 保存默认模型到本地存储
+        saveModel(defaultModel);
+        localModels = [defaultModel];
+      }
+      
+      if (localModels.length > 0) {
+        setModels(localModels);
 
         // 如果没有当前选中的模型，选择第一个
         if (!currentModel && !showUploadedModels) {
-          setSelectedModel(storageModels[0].id);
-          setCurrentModel(storageModels[0]);
+          setSelectedModel(localModels[0].id);
+          setCurrentModel(localModels[0]);
         }
-
-        // 同步数据库中的模型记录
-        await syncModelsWithDatabase(storageModels);
+        
+        // 本地存储不需要额外同步
 
         // 检查哪些模型需要生成缩略图
-        const needThumbnails = storageModels.filter(model =>
-          !model.thumbnail_url ||
-          model.thumbnail_url.includes('placehold.co')
-        );
+        const needThumbnails = localModels.filter(model => 
+          !model.thumbnail_url || model.thumbnail_url.includes('placehold.co'));
 
         if (needThumbnails.length > 0) {
+          // 添加到缩略图生成队列
           setModelsNeedingThumbnails(needThumbnails);
+          
+          // 如果当前没有正在处理缩略图，开始处理
+          if (!processingThumbnails) {
+            setProcessingThumbnails(true);
+          }
         } else {
-          setModelsNeedingThumbnails([]);
-
           // 预加载所有缩略图
-          const thumbnailUrls = storageModels
+          const thumbnailUrls = localModels
             .filter(model => model.thumbnail_url && !model.thumbnail_url.includes('placehold.co'))
             .map(model => model.thumbnail_url as string);
 
@@ -291,181 +279,24 @@ export const Screen = (): JSX.Element => {
 
 
 
-  // 从存储桶获取模型
-  const getModelsFromStorage = async (): Promise<Model[]> => {
-    try {
-      // 列出存储桶中的文件
-      const { data: storageData, error: storageError } = await supabase
-        .storage
-        .from('models')
-        .list();
-
-      if (storageError) {
-        console.error('获取存储桶数据错误:', storageError);
-        return [];
-      }
-
-      if (!storageData || storageData.length === 0) {
-        return [];
-      }
-
-      // 过滤出3D模型文件
-      const modelFiles = storageData.filter(file => {
-        const extension = file.name.split('.').pop()?.toLowerCase();
-        return ['glb', 'gltf', 'obj', 'fbx'].includes(extension || '');
-      });
-
-      if (modelFiles.length === 0) {
-        return [];
-      }
-
-      // 将存储桶中的文件转换为模型数据格式
-      const storageModels: Model[] = await Promise.all(modelFiles.map(async (file) => {
-        // 获取文件的公共URL
-        const { data: { publicUrl } } = supabase
-          .storage
-          .from('models')
-          .getPublicUrl(file.name);
-
-        // 查询数据库中是否已有该模型的记录和缩略图
-        const { data: existingModels, error: queryError } = await supabase
-          .from('models')
-          .select('*')
-          .eq('file_path', publicUrl)
-          .limit(1);
-
-        // 如果数据库中已有记录且有缩略图，使用现有缩略图
-        let thumbnailUrl = null;
-        if (!queryError && existingModels && existingModels.length > 0 && existingModels[0].thumbnail_url) {
-          thumbnailUrl = existingModels[0].thumbnail_url;
-        }
-
-        return {
-          id: `storage_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-          name: file.name,
-          description: `存储桶中的模型: ${file.name}`,
-          file_path: publicUrl,
-          thumbnail_url: thumbnailUrl,
-          created_at: file.created_at || new Date().toISOString(),
-          updated_at: file.updated_at || new Date().toISOString()
-        };
-      }));
-
-      return storageModels;
-    } catch (error) {
-      console.error('从存储桶获取模型时出错:', error);
-      return [];
-    }
-  };
-
-  // 同步数据库中的模型记录
-  const syncModelsWithDatabase = async (storageModels: Model[]) => {
-    try {
-      // 获取数据库中现有的模型记录
-      const { data: existingModels, error: fetchError } = await supabase
-        .from('models')
-        .select('*');
-
-      if (fetchError) {
-        console.error('获取现有模型记录失败:', fetchError);
-        return;
-      }
-
-      // 创建一个映射，用于快速查找文件路径对应的现有记录
-      const existingModelMap = new Map();
-      existingModels.forEach(model => {
-        existingModelMap.set(model.file_path, model);
-      });
-
-      // 跟踪已处理的文件路径
-      const processedFilePaths = new Set();
-
-      // 为每个存储桶中的模型创建或更新记录
-      for (const model of storageModels) {
-        processedFilePaths.add(model.file_path);
-
-        // 检查是否已存在相同文件路径的记录
-        const existingModel = existingModelMap.get(model.file_path);
-
-        // 如果没有缩略图，尝试生成一个
-        let thumbnailUrl = model.thumbnail_url;
-        if (!thumbnailUrl && (!existingModel || !existingModel.thumbnail_url || existingModel.thumbnail_url.includes('placehold.co'))) {
-          const thumbnailDataUrl = await generateModelThumbnail(model.file_path);
-          if (thumbnailDataUrl) {
-            thumbnailUrl = await uploadThumbnail(thumbnailDataUrl, model.name);
-            if (thumbnailUrl) {
-              model.thumbnail_url = thumbnailUrl;
-            }
-          }
-        } else if (existingModel && existingModel.thumbnail_url && !existingModel.thumbnail_url.includes('placehold.co')) {
-          // 使用现有的缩略图
-          thumbnailUrl = existingModel.thumbnail_url;
-        }
-
-        if (existingModel) {
-          // 更新现有记录
-          const { error: updateError } = await supabase
-            .from('models')
-            .update({
-              name: model.name,
-              description: model.description,
-              thumbnail_url: thumbnailUrl || existingModel.thumbnail_url,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingModel.id);
-
-          if (updateError) {
-            console.error(`更新模型 ${model.name} 记录失败:`, updateError);
-          }
-        } else {
-          // 创建新记录
-          const { error: insertError } = await supabase
-            .from('models')
-            .insert([{
-              name: model.name,
-              description: model.description,
-              file_path: model.file_path,
-              thumbnail_url: thumbnailUrl,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            }]);
-
-          if (insertError) {
-            console.error(`保存模型 ${model.name} 到表中出错:`, insertError);
-          }
-        }
-      }
-
-      // 删除存储桶中不存在的记录
-      const recordsToDelete = existingModels.filter(model => !processedFilePaths.has(model.file_path));
-
-      if (recordsToDelete.length > 0) {
-        for (const model of recordsToDelete) {
-          const { error: deleteError } = await supabase
-            .from('models')
-            .delete()
-            .eq('id', model.id);
-
-          if (deleteError) {
-            console.error(`删除模型记录 ${model.id} 失败:`, deleteError);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('同步数据库记录时出错:', error);
-    }
-  };
+  // 从本地存储获取模型 - 已内联到fetchModels中
+  // 同步模型数据到本地存储 - 已通过直接调用saveModel/deleteModel实现
 
   // 处理缩略图生成完成事件
   const handleThumbnailGenerated = useCallback((modelId: string, thumbnailUrl: string) => {
     // 更新模型列表中的缩略图URL
-    setModels(prevModels =>
-      prevModels.map(model =>
+    setModels(prevModels => {
+      const updatedModels = prevModels.map(model =>
         model.id === modelId
           ? { ...model, thumbnail_url: thumbnailUrl }
           : model
-      )
-    );
+      );
+      
+      // 使用本地存储更新缩略图
+      updateModelThumbnail(modelId, thumbnailUrl);
+      
+      return updatedModels;
+    });
 
     // 从需要生成缩略图的列表中移除该模型
     setModelsNeedingThumbnails(prevModels =>
@@ -631,7 +462,6 @@ export const Screen = (): JSX.Element => {
           setSelectedMaterialId(data[0].id);
           // 应用第一个材质的属性
           setCustomColor(data[0].color);
-          setCustomRoughness(data[0].roughness);
           setCustomMetallic(data[0].metallic);
 
           // 初始化模型材质
@@ -705,58 +535,8 @@ export const Screen = (): JSX.Element => {
           <Button
             variant="ghost"
             className="h-8 inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
-            onMouseEnter={() => setIsCapturingMode(true)}
-            onMouseLeave={() => setIsCapturingMode(false)}
             onClick={() => {
-              // 使用全局暴露的方法获取截图
-              if (window && (window as any).captureModelScreenshot) {
-                const dataURL = (window as any).captureModelScreenshot();
-                if (dataURL) {
-                  // 创建一个临时的canvas元素
-                  const canvas = document.createElement('canvas');
-                  const ctx = canvas.getContext('2d');
-                  const img = new Image();
-
-                  img.onload = () => {
-                    // 设置canvas大小与图像一致
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-
-                    // 绘制图像到canvas
-                    ctx?.drawImage(img, 0, 0);
-
-                    // 将canvas内容复制到剪贴板
-                    canvas.toBlob((blob) => {
-                      if (blob) {
-                        try {
-                          // 使用Clipboard API复制图像
-                          navigator.clipboard.write([
-                            new ClipboardItem({
-                              [blob.type]: blob
-                            })
-                          ]).then(() => {
-                            alert('图片已复制到剪贴板');
-                            setIsCapturingMode(false);
-                          }).catch(err => {
-                            console.error('复制到剪贴板失败:', err);
-                            alert('复制到剪贴板失败，请检查浏览器权限');
-                            setIsCapturingMode(false);
-                          });
-                        } catch (e) {
-                          console.error('复制到剪贴板时出错:', e);
-                          alert('复制到剪贴板失败，请使用保存图片功能');
-                          setIsCapturingMode(false);
-                        }
-                      }
-                    });
-                  };
-
-                  img.src = dataURL;
-                }
-              } else {
-                alert('无法获取模型截图，请稍后再试');
-                setIsCapturingMode(false);
-              }
+              alert('截图功能已禁用');
             }}
           >
             <CopyIcon className="w-4 h-4 text-[#ffffffb2]" />
@@ -766,31 +546,14 @@ export const Screen = (): JSX.Element => {
           </Button>
 
           <Button
-            className="h-8 inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-[#2268eb] rounded-lg hover:bg-[#2268eb]/90"
-            onMouseEnter={() => setIsCapturingMode(true)}
-            onMouseLeave={() => setIsCapturingMode(false)}
+            variant="default"
+            className="h-8 inline-flex items-center justify-center gap-1 px-3 py-1.5 btn-primary"
             onClick={() => {
-              // 使用全局暴露的方法获取截图
-              if (window && (window as any).captureModelScreenshot) {
-                const dataURL = (window as any).captureModelScreenshot();
-                if (dataURL) {
-                  // 创建下载链接
-                  const link = document.createElement('a');
-                  link.href = dataURL;
-                  link.download = `${currentModel?.name || 'model'}_${new Date().toISOString().slice(0, 10)}.png`;
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                  setIsCapturingMode(false);
-                }
-              } else {
-                alert('无法获取模型截图，请稍后再试');
-                setIsCapturingMode(false);
-              }
+              alert('截图功能已禁用');
             }}
           >
             <DownloadIcon className="w-4 h-4" />
-            <span className="mt-[-1.00px] text-white w-fit text-[14px] font-[500] leading-normal">
+            <span className="w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal">
               保存图片
             </span>
           </Button>
@@ -808,7 +571,6 @@ export const Screen = (): JSX.Element => {
                 customColor={customColor}
                 customRoughness={customRoughness}
                 customMetallic={customMetallic}
-                isCapturingMode={isCapturingMode}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-white opacity-50">
@@ -857,8 +619,8 @@ export const Screen = (): JSX.Element => {
                 </span>
               </div>
 
-              {/* 模型卡片列表 */}
-              <div className="max-h-[30vh] overflow-y-auto pr-1 mb-2 scrollbar-thin scrollbar-thumb-[#3a3a3a] scrollbar-track-transparent w-full">
+              {/* 模型选择下拉框 */}
+              <div className="mb-2 w-full">
                 {loading ? (
                   <div className="p-4 text-center text-[#ffffff80] text-[14px] w-full">
                     <div className="flex justify-center items-center space-x-2">
@@ -867,38 +629,30 @@ export const Screen = (): JSX.Element => {
                     </div>
                   </div>
                 ) : (
-                  <>
-                    {/* 根据状态显示上传的模型或内置模型 */}
-                    {(showUploadedModels ? uploadedModels : models).map((model) => (
-                      <ModelListItem
-                        key={model.id}
-                        model={model}
-                        isSelected={selectedModel === model.id}
-                        onSelect={(modelId) => {
-                          // 先清除当前模型，然后设置新模型，确保状态更新
-                          setCurrentModel(null);
-                          setSelectedModel('');
+                  <ModelSelect
+                    models={showUploadedModels ? uploadedModels : models}
+                    selectedModel={selectedModel}
+                    onSelect={(modelId: string) => {
+                      // 先清除当前模型，然后设置新模型，确保状态更新
+                      setCurrentModel(null);
+                      setSelectedModel('');
 
-                          // 使用setTimeout确保状态更新后再设置新模型
-                          setTimeout(() => {
-                            setSelectedModel(modelId);
-                            setCurrentModel(model);
-                          }, 50);
-                        }}
-                        onDelete={showUploadedModels ? deleteUploadedModel : undefined}
-                        showDeleteButton={showUploadedModels}
-                      />
-                    ))}
-
-                    {/* 当没有模型时显示提示 */}
-                    {(showUploadedModels ? uploadedModels : models).length === 0 && (
-                      <div className="p-4 text-center text-[#ffffff80] text-[14px] w-full">
-                        {showUploadedModels ? '没有上传的模型' : '没有可用的模型'}
-                      </div>
-                    )}
-                  </>
+                      // 使用setTimeout确保状态更新后再设置新模型
+                      setTimeout(() => {
+                        setSelectedModel(modelId);
+                        const model = (showUploadedModels ? uploadedModels : models).find(m => m.id === modelId);
+                        if (model) {
+                          setCurrentModel(model);
+                        }
+                      }, 50);
+                    }}
+                    onDelete={showUploadedModels ? deleteUploadedModel : undefined}
+                    showDeleteButton={showUploadedModels}
+                  />
                 )}
               </div>
+              
+              {/* 上传的模型管理按钮 */}
 
               <input
                 type="file"

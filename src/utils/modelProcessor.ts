@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { supabase } from '../lib/supabase';
+import { saveFileToMemory } from './fileStorage';
 import { ensureThumbnailsBucketExists } from './storageBuckets';
 
 /**
@@ -200,10 +200,10 @@ export const generateModelThumbnail = async (modelUrl: string): Promise<string |
 };
 
 /**
- * 上传缩略图到Supabase存储
+ * 保存缩略图到本地存储
  * @param thumbnailDataUrl 缩略图的Data URL
  * @param modelName 模型名称，用于生成缩略图文件名
- * @returns 缩略图的公共URL，如果上传失败则返回null
+ * @returns 缩略图的URL，如果保存失败则返回null
  */
 export const uploadThumbnail = async (thumbnailDataUrl: string, modelName: string): Promise<string | null> => {
   try {
@@ -220,25 +220,11 @@ export const uploadThumbnail = async (thumbnailDataUrl: string, modelName: strin
     // 生成唯一的文件名
     const fileName = `${Date.now()}_${modelName.replace(/\.[^/.]+$/, '')}_thumbnail.png`;
 
-    // 上传到Supabase
-    const { data, error } = await supabase.storage
-      .from('thumbnails')
-      .upload(fileName, blob, {
-        contentType: 'image/png',
-        upsert: false
-      });
-
-    if (error) {
-      return null;
-    }
-
-    // 获取公共URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('thumbnails')
-      .getPublicUrl(data.path);
-
-    return publicUrl;
+    // 保存到本地存储并返回URL
+    const fileUrl = saveFileToMemory(blob);
+    return fileUrl;
   } catch (error) {
+    console.error('保存缩略图失败:', error);
     return null;
   }
 };

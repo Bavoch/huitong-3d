@@ -1,8 +1,8 @@
 import React, { useRef, useEffect, useState, Suspense, useCallback } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas } from '@react-three/fiber';
 import { OrbitControls, useGLTF, Html, Environment } from '@react-three/drei';
 import * as THREE from 'three';
-import { type Model } from '../lib/supabase';
+import { type Model } from '../lib/localStorage';
 
 // 改进的加载指示器组件，显示进度和阶段
 function LoadingIndicator({ progress = 0, stage = '准备中' }: { progress?: number; stage?: string }) {
@@ -54,14 +54,12 @@ function ModelLoader({
   modelPath,
   customColor,
   customRoughness,
-  customMetallic,
-  autoRotate
+  customMetallic
 }: {
   modelPath: string;
   customColor: string;
   customRoughness: number;
   customMetallic: number;
-  autoRotate: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [useDefaultModel, setUseDefaultModel] = useState(false);
@@ -99,10 +97,8 @@ function ModelLoader({
     if (!modelPath.startsWith('blob:')) {
       // 对于非Blob URL，检查路径是否有效
       try {
-        const url = new URL(modelPath);
-
         // 检查文件扩展名
-        const fileExtension = url.pathname.split('.').pop()?.toLowerCase();
+        const fileExtension = modelPath.split('.').pop()?.toLowerCase();
 
         if (!['glb', 'gltf'].includes(fileExtension || '')) {
           console.error('不支持的文件格式:', fileExtension);
@@ -111,19 +107,15 @@ function ModelLoader({
           return;
         }
       } catch (e) {
-        console.error('模型路径无效:', modelPath);
+        console.error('模型路径验证出错:', modelPath, e);
+        setError('模型路径无效');
         setUseDefaultModel(true);
         return;
       }
     }
   }, [modelPath, loadAttempts]);
 
-  // 添加简单的旋转动画，根据autoRotate状态决定是否旋转
-  useFrame(() => {
-    if (groupRef.current && autoRotate) {
-      groupRef.current.rotation.y += 0.005;
-    }
-  });
+  // 移除了旋转动画逻辑
 
   // 处理模型加载错误
   const handleModelError = useCallback(() => {
@@ -131,7 +123,7 @@ function ModelLoader({
 
     // 如果尝试次数小于3，增加尝试次数并重试
     if (loadAttempts < 2) {
-      console.log(`自动重试加载模型 (尝试 ${loadAttempts + 1}/3)...`);
+      // 自动重试加载模型
       setLoadAttempts(prev => prev + 1);
     } else {
       // 超过最大尝试次数，显示错误
@@ -142,7 +134,7 @@ function ModelLoader({
 
   // 手动重试加载
   const handleRetry = useCallback(() => {
-    console.log('手动重试加载模型...');
+    // 手动重试加载模型
     setError(null);
     setUseDefaultModel(false);
     setLoadAttempts(prev => prev + 1);
@@ -232,7 +224,7 @@ function ModelObject({
   // 重试加载
   const retryLoading = useCallback(() => {
     if (retryCount < maxRetries) {
-      console.log(`尝试重新加载模型 (${retryCount + 1}/${maxRetries})...`);
+      // 尝试重新加载模型
       setRetryCount(prev => prev + 1);
       setLoadError(false);
       resetLoadingState();
@@ -347,22 +339,20 @@ function ModelObject({
         // 使用进度跟踪器加载模型
         let gltfScene;
 
-        // 对于 Blob URL，我们直接使用 useGLTF
-        if (modelPath.startsWith('blob:')) {
-          setLoadStage('加载本地文件');
-          useGLTF.preload(modelPath);
-          const gltf = useGLTF(modelPath);
-          gltfScene = gltf.scene;
-          setLoadProgress(90);
-        } else {
-          // 对于远程 URL，使用进度跟踪器
-          gltfScene = await createProgressTracker(modelPath);
+        // 对于本地文件路径，确保以 / 开头
+        let modelUrl = modelPath;
+        if (!modelPath.startsWith('blob:') && !modelPath.startsWith('http')) {
+          // 确保路径以 / 开头
+          modelUrl = modelPath.startsWith('/') ? modelPath : `/${modelPath}`;
         }
+        
+        // 使用进度跟踪器加载模型
+        gltfScene = await createProgressTracker(modelUrl);
 
         if (!isMounted) return;
 
         if (gltfScene) {
-          console.log('模型场景加载成功，开始处理');
+          // 模型场景加载成功，开始处理
           setLoadStage('应用材质');
           setLoadProgress(95);
 
@@ -405,7 +395,7 @@ function ModelObject({
           scene.position.y = -center.y * scale;
           scene.position.z = -center.z * scale;
 
-          console.log('模型处理完成，设置到场景');
+          // 模型处理完成，设置到场景
           setLoadProgress(100);
           setLoadStage('完成');
           setModelScene(scene);
@@ -418,7 +408,7 @@ function ModelObject({
         console.error('加载模型失败:', error);
         if (isMounted) {
           if (retryCount < maxRetries) {
-            console.log(`加载失败，自动重试 (${retryCount + 1}/${maxRetries})...`);
+            // 加载失败，自动重试
             retryLoading();
           } else {
             setLoadError(true);
@@ -513,24 +503,23 @@ interface ModelViewerProps {
   customColor: string;
   customRoughness: number;
   customMetallic: number;
-  isCapturingMode?: boolean; // 是否处于截图预览模式
 }
 
 export const ModelViewer: React.FC<ModelViewerProps> = ({
   selectedModel,
   customColor,
   customRoughness,
-  customMetallic,
-  isCapturingMode = false
+  customMetallic
 }) => {
   const [modelViewKey, setModelViewKey] = useState<string>('');
   const [modelValid, setModelValid] = useState<boolean>(true);
   const [modelPath, setModelPath] = useState<string>('');
-  const [autoRotate, setAutoRotate] = useState<boolean>(true);
   const previousModelIdRef = useRef<string>('');
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.Camera | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const defaultCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const controlsRef = useRef<any>(null);
 
   // 验证和处理模型路径
   useEffect(() => {
@@ -541,10 +530,19 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
 
       // 验证文件路径
       try {
-        const url = new URL(selectedModel.file_path);
+        let filePath = selectedModel.file_path;
+        
+        // 处理相对路径
+        if (filePath.startsWith('/')) {
+          // 如果是绝对路径，确保它指向 public 目录
+          filePath = filePath.startsWith('/public') ? filePath : filePath;
+        } else {
+          // 如果是相对路径，添加 / 前缀
+          filePath = filePath.startsWith('./') ? filePath.substring(1) : `/${filePath}`;
+        }
 
         // 检查文件扩展名
-        const fileExtension = url.pathname.split('.').pop()?.toLowerCase();
+        const fileExtension = filePath.split('.').pop()?.toLowerCase();
 
         // 检查是否为支持的格式
         const isValidFormat = ['glb', 'gltf'].includes(fileExtension || '');
@@ -552,7 +550,7 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
 
         if (isValidFormat) {
           // 设置模型路径
-          setModelPath(selectedModel.file_path);
+          setModelPath(filePath);
 
           // 只有在模型变化时才生成新的key
           if (modelChanged) {
@@ -567,7 +565,7 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
           setModelValid(false);
         }
       } catch (e) {
-        console.error('文件路径无效:', selectedModel.file_path);
+        console.error('文件路径无效:', selectedModel.file_path, e);
         setModelValid(false);
       }
     } else {
@@ -690,6 +688,78 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
     return dataURL;
   }, [sceneRef, cameraRef]);
 
+  // 创建默认摄像机
+  useEffect(() => {
+    if (!defaultCameraRef.current) {
+      defaultCameraRef.current = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+      // 设置默认摄像机位置，从斜上方45度角观察
+      defaultCameraRef.current.position.set(5, 5, 5);
+      defaultCameraRef.current.lookAt(0, 0, 0);
+    }
+  }, []);
+
+  // 恢复默认视图
+  const resetToDefaultView = useCallback(() => {
+    if (controlsRef.current && defaultCameraRef.current) {
+      // 如果有模型，确保模型居中
+      if (sceneRef.current) {
+        // 查找模型对象
+        let modelGroup: THREE.Group | null = null;
+        sceneRef.current.traverse((object) => {
+          // 检查是否为Group类型
+          if (object instanceof THREE.Group) {
+            // 检查是否为置于场景中的模型对象，而非场景本身
+            if (sceneRef.current && object.uuid !== sceneRef.current.uuid) {
+              modelGroup = object;
+            }
+          }
+        });
+
+        if (modelGroup) {
+          // 计算包围盒
+          const box = new THREE.Box3().setFromObject(modelGroup);
+          const center = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
+
+          // 重置模型位置
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const scale = 2 / maxDim; // 缩放到合适的大小
+
+          // 更新模型比例和位置
+          if (modelGroup) {
+            // 使用显式类型断言以避免 TypeScript 错误
+            const group = modelGroup as THREE.Group;
+            group.scale.set(scale, scale, scale);
+            group.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
+            group.rotation.set(0, 0, 0);
+          }
+
+          // 计算适合模型的摄像机位置
+          const distance = maxDim * 1.5;
+          if (defaultCameraRef.current) {
+            defaultCameraRef.current.position.set(distance, distance, distance);
+            defaultCameraRef.current.lookAt(0, 0, 0);
+          }
+        } else {
+          // 如果没有模型，使用默认摄像机位置
+          if (defaultCameraRef.current) {
+            defaultCameraRef.current.position.set(5, 5, 5);
+            defaultCameraRef.current.lookAt(0, 0, 0);
+          }
+        }
+
+        // 更新当前摄像机到默认摄像机的位置和朝向
+        if (cameraRef.current) {
+          cameraRef.current.position.copy(defaultCameraRef.current.position);
+          cameraRef.current.rotation.copy(defaultCameraRef.current.rotation);
+        }
+      }
+
+      // 重置控制器
+      controlsRef.current.reset();
+    }
+  }, [controlsRef, sceneRef, cameraRef]);
+
   // 将渲染器引用暴露给父组件
   useEffect(() => {
     // 将捕获截图的方法暴露给父组件
@@ -707,25 +777,7 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
 
   return (
     <div className="w-full h-full relative">
-      {/* 截图预览模式下的遮罩和指示器 */}
-      {isCapturingMode && (
-        <div className="absolute inset-0 z-20 pointer-events-none">
-          <div className="w-full h-full flex items-center justify-center">
-            {/* 中心区域保持透明，周围区域暗化 */}
-            <div className="absolute inset-0 bg-black/50"></div>
-            <div className="relative w-[80%] h-[80%] max-w-[800px] max-h-[800px] aspect-square">
-              {/* 透明区域 */}
-              <div className="absolute inset-0 border-2 border-dashed border-white/70 rounded-lg"></div>
-              {/* 移除暗化效果 */}
-              <div className="absolute inset-0 bg-transparent"></div>
-              {/* 尺寸指示 */}
-              <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-2 py-1 rounded text-xs whitespace-nowrap">
-                导出尺寸: 1200 × 1200 像素
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       <Canvas
         camera={{ position: [0, 0, 5], fov: 50 }}
@@ -740,7 +792,7 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
           // 保存渲染器、场景和相机引用
           rendererRef.current = gl;
           sceneRef.current = scene;
-          cameraRef.current = camera;
+          cameraRef.current = camera as THREE.PerspectiveCamera;
         }}
       >
         <SceneLighting />
@@ -752,7 +804,6 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
               customColor={customColor}
               customRoughness={customRoughness}
               customMetallic={customMetallic}
-              autoRotate={autoRotate}
             />
           ) : (
             <DefaultModel />
@@ -763,6 +814,7 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
             background={false}
           />
           <OrbitControls
+            ref={controlsRef}
             enableZoom={true}
             enablePan={false}
             enableDamping={false}
@@ -773,35 +825,18 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
         </Suspense>
       </Canvas>
 
-      {/* 自动旋转控制按钮 */}
-      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10">
-        <button
-          onClick={() => setAutoRotate(prev => !prev)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[99px] transition-colors ${
-            autoRotate
-              ? 'bg-[#2268eb] text-white hover:bg-[#2268eb]/90'
-              : 'bg-[#ffffff1a] text-[#ffffffb2] hover:bg-[#ffffff26]'
-          }`}
+      {/* 控制按钮区域 */}
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 inline-flex justify-start items-center gap-3">
+        {/* 默认视图按钮 */}
+        <div
+          className="pl-2 pr-1 py-1 bg-背景-容器背景1/5 rounded-[99px] flex justify-start items-center gap-1.5 cursor-pointer"
+          onClick={resetToDefaultView}
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={`${autoRotate ? 'animate-spin' : ''}`}
-            style={{ animationDuration: '3s' }}
-          >
-            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
-          </svg>
-          <span className="text-[14px] font-[500] leading-normal">
-            {autoRotate ? '停止旋转' : '自动旋转'}
-          </span>
-        </button>
+          <div className="justify-start text-内容-常规/70 text-sm font-medium font-['PingFang_SC']">默认视图</div>
+          <div className="w-4 h-4 relative overflow-hidden">
+            <div className="w-3 h-3 left-[2px] top-[2px] absolute outline outline-1 outline-offset-[-0.50px] outline-内容-常规/70" />
+          </div>
+        </div>
       </div>
     </div>
   );

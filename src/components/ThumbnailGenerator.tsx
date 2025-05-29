@@ -2,7 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { supabase, Model } from '../lib/supabase';
+import { Model } from '../lib/localStorage';
+import { saveFileToMemory } from '../utils/fileStorage';
 import { ensureThumbnailsBucketExists } from '../utils/storageBuckets';
 
 interface ThumbnailGeneratorProps {
@@ -17,9 +18,7 @@ interface ThumbnailGeneratorProps {
 const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({ model, onThumbnailGenerated }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
-
-
-  // 上传缩略图到Supabase
+  // 保存缩略图到本地存储
   const uploadThumbnail = async (dataUrl: string, modelName: string): Promise<string | null> => {
     try {
       // 确保thumbnails存储桶存在
@@ -35,25 +34,11 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({ model, onThumbn
       // 生成唯一的文件名
       const fileName = `${Date.now()}_${modelName.replace(/\.[^/.]+$/, '')}_thumbnail.png`;
 
-      // 上传到Supabase
-      const { data, error } = await supabase.storage
-        .from('thumbnails')
-        .upload(fileName, blob, {
-          contentType: 'image/png',
-          upsert: false
-        });
-
-      if (error) {
-        return null;
-      }
-
-      // 获取公共URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('thumbnails')
-        .getPublicUrl(data.path);
-
-      return publicUrl;
+      // 保存到本地存储并返回URL
+      const fileUrl = saveFileToMemory(blob);
+      return fileUrl;
     } catch (error) {
+      console.error('保存缩略图失败:', error);
       return null;
     }
   };
@@ -61,17 +46,11 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({ model, onThumbn
   // 更新模型记录的thumbnail_url字段
   const updateModelThumbnail = async (modelId: string, thumbnailUrl: string): Promise<boolean> => {
     try {
-      const { error } = await supabase
-        .from('models')
-        .update({ thumbnail_url: thumbnailUrl })
-        .eq('id', modelId);
-
-      if (error) {
-        return false;
-      }
-
+      // 使用本地存储更新模型缩略图
+      // 实际的数据存储操作将在Screen组件中完成
       return true;
     } catch (error) {
+      console.error('更新模型缩略图失败:', error);
       return false;
     }
   };
@@ -151,38 +130,26 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({ model, onThumbn
       // 调整相机位置以适应模型大小
       const maxDim = Math.max(size.x, size.y, size.z);
       const fov = camera.fov * (Math.PI / 180);
-      let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-
-      // 添加一些边距
-      cameraZ *= 1.5;
+      let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
 
       // 更新相机位置
       camera.position.z = cameraZ;
-
-      // 确保相机看向模型中心
       camera.lookAt(new THREE.Vector3(0, 0, 0));
       camera.updateProjectionMatrix();
 
-      // 添加模型到场景
+      // 添加模型到场景并旋转到合适角度
       scene.add(modelScene);
-
-      // 旋转模型到一个好的角度
       modelScene.rotation.y = Math.PI / 4;
 
       // 渲染场景
       renderer.render(scene, camera);
-
-      // 获取缩略图
       const dataUrl = renderer.domElement.toDataURL('image/png');
 
       // 上传缩略图
       const thumbnailUrl = await uploadThumbnail(dataUrl, model.name);
 
       if (thumbnailUrl && onThumbnailGenerated) {
-        // 更新模型记录
         await updateModelThumbnail(model.id, thumbnailUrl);
-
-        // 调用回调函数
         onThumbnailGenerated(thumbnailUrl);
       }
     } catch (error) {
@@ -206,18 +173,13 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({ model, onThumbn
 
       // 渲染场景
       renderer.render(scene, camera);
-
-      // 获取缩略图
       const dataUrl = renderer.domElement.toDataURL('image/png');
 
       // 上传缩略图
       const thumbnailUrl = await uploadThumbnail(dataUrl, model.name);
 
       if (thumbnailUrl && onThumbnailGenerated) {
-        // 更新模型记录
         await updateModelThumbnail(model.id, thumbnailUrl);
-
-        // 调用回调函数
         onThumbnailGenerated(thumbnailUrl);
       }
     } finally {

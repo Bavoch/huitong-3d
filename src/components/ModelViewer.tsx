@@ -34,15 +34,19 @@ function LoadingIndicator({ progress = 0, stage = '准备中' }: { progress?: nu
 
 
 
-// 默认模型组件 - 当没有实际模型时显示
+// 默认模型组件 - 当没有实际模型时显示一个基础几何体
 function DefaultModel() {
   return (
     <group>
-      {/* 简单的文字提示 */}
-      <Html position={[0, 0, 0]} center>
+      {/* 使用基础几何体代替空模型 */}
+      <mesh position={[0, 0, 0]} castShadow receiveShadow>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#cccccc" roughness={0.5} metalness={0.2} />
+      </mesh>
+      <Html position={[0, 1.5, 0]} center>
         <div className="bg-black/70 text-white px-6 py-4 rounded-md text-center">
-          <div className="text-white font-medium text-lg">模型加载中...</div>
-          <div className="text-gray-300 mt-2">请稍候或选择其他模型</div>
+          <div className="text-white font-medium text-lg">使用默认模型显示</div>
+          <div className="text-gray-300 mt-2 text-sm">原模型文件不可用或正在加载</div>
         </div>
       </Html>
     </group>
@@ -531,6 +535,13 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
       // 验证文件路径
       try {
         let filePath = selectedModel.file_path;
+        
+        // 判断是否为旧的错误路径
+        if (filePath.includes('office_chair') || filePath === '/duck.glb') {
+          console.warn('发现无效模型路径，切换到默认模型:', filePath);
+          // 如果是已知的错误路径，替换为默认模型
+          filePath = '/models/blenderco_cn.glb';
+        }
         
         // 处理相对路径
         if (filePath.startsWith('/')) {

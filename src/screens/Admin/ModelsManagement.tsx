@@ -144,48 +144,70 @@ export const ModelsManagement = (): JSX.Element => {
         </div>
       )}
       
-      {/* 模型列表 */}
-      <div className="grid grid-cols-3 gap-4">
-        {filteredModels.map(model => (
-          <Card key={model.id} className="bg-white border-gray-200 shadow-sm hover:shadow transition-shadow">
-            <CardContent className="p-0">
-              <div className="aspect-square overflow-hidden bg-gray-50 flex items-center justify-center border-b border-gray-200">
-                {model.thumbnail_url ? (
-                  <img 
-                    src={model.thumbnail_url} 
-                    alt={model.name}
-                    className="w-full h-full object-contain"
-                  />
-                ) : (
-                  <div className="text-gray-400">无预览图</div>
-                )}
-              </div>
-              <div className="p-4">
-                <h3 className="text-lg font-medium text-gray-800 truncate mb-1" title={model.name}>
-                  {model.name}
-                </h3>
-                {model.description && (
-                  <p className="text-gray-500 text-sm line-clamp-2" title={model.description}>
-                    {model.description}
-                  </p>
-                )}
-                <div className="flex justify-between items-center mt-3">
-                  <span className="text-xs text-gray-400">
-                    上传时间: {new Date(model.created_at || '').toLocaleDateString()}
-                  </span>
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
-                    className="h-8 px-2 bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
+      {/* 模型表格 */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                缩略图
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                名称
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                描述
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                上传时间
+              </th>
+              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                操作
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {filteredModels.map((model) => (
+              <tr key={model.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="w-16 h-16 bg-gray-100 rounded overflow-hidden flex items-center justify-center">
+                    {model.thumbnail_url ? (
+                      <img 
+                        src={model.thumbnail_url} 
+                        alt={model.name}
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    ) : (
+                      <div className="text-gray-400 text-xs">无预览</div>
+                    )}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm font-medium text-gray-900">{model.name}</div>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="text-sm text-gray-500 max-w-xs truncate" title={model.description || ''}>
+                    {model.description || '-'}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-500">
+                    {new Date(model.created_at || '').toLocaleString()}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <button
                     onClick={() => handleDeleteModel(model.id)}
+                    className="text-red-600 hover:text-red-900 mr-4"
+                    title="删除"
                   >
-                    <TrashIcon className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                    <TrashIcon className="h-5 w-5" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

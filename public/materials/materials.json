@@ -4,191 +4,167 @@
     "name": "金属",
     "color": "#D4D4D4",
     "roughness": 0.1,
-    "metallic": 1,
-    "imagePath": "/materials/material-0.png"
+    "metallic": 1
   },
   {
     "id": 1,
     "name": "金",
     "color": "#FFD700",
     "roughness": 0.1,
-    "metallic": 1,
-    "imagePath": "/materials/material-1.png"
+    "metallic": 1
   },
   {
     "id": 2,
     "name": "银",
     "color": "#C0C0C0",
     "roughness": 0.1,
-    "metallic": 1,
-    "imagePath": "/materials/material-2.png"
+    "metallic": 1
   },
   {
     "id": 3,
     "name": "铜",
     "color": "#B87333",
     "roughness": 0.2,
-    "metallic": 1,
-    "imagePath": "/materials/material-3.png"
+    "metallic": 1
   },
   {
     "id": 4,
     "name": "铬",
     "color": "#E8E8E8",
     "roughness": 0.05,
-    "metallic": 1,
-    "imagePath": "/materials/material-4.png"
+    "metallic": 1
   },
   {
     "id": 5,
     "name": "塑料红",
     "color": "#FF5252",
     "roughness": 0.7,
-    "metallic": 0,
-    "imagePath": "/materials/material-5.png"
+    "metallic": 0
   },
   {
     "id": 6,
     "name": "塑料蓝",
     "color": "#4285F4",
     "roughness": 0.7,
-    "metallic": 0,
-    "imagePath": "/materials/material-6.png"
+    "metallic": 0
   },
   {
     "id": 7,
     "name": "塑料绿",
     "color": "#0F9D58",
     "roughness": 0.7,
-    "metallic": 0,
-    "imagePath": "/materials/material-7.png"
+    "metallic": 0
   },
   {
     "id": 8,
     "name": "塑料黄",
     "color": "#FFEB3B",
     "roughness": 0.7,
-    "metallic": 0,
-    "imagePath": "/materials/material-8.png"
+    "metallic": 0
   },
   {
     "id": 9,
     "name": "塑料黑",
     "color": "#212121",
     "roughness": 0.7,
-    "metallic": 0,
-    "imagePath": "/materials/material-9.png"
+    "metallic": 0
   },
   {
     "id": 10,
     "name": "塑料白",
     "color": "#FFFFFF",
     "roughness": 0.7,
-    "metallic": 0,
-    "imagePath": "/materials/material-10.png"
+    "metallic": 0
   },
   {
     "id": 11,
     "name": "玻璃",
     "color": "#E0F7FA",
     "roughness": 0,
-    "metallic": 0,
-    "imagePath": "/materials/material-11.png"
+    "metallic": 0
   },
   {
     "id": 12,
     "name": "橡胶",
     "color": "#424242",
     "roughness": 1,
-    "metallic": 0,
-    "imagePath": "/materials/material-12.png"
+    "metallic": 0
   },
   {
     "id": 13,
     "name": "木材",
     "color": "#8D6E63",
     "roughness": 0.9,
-    "metallic": 0,
-    "imagePath": "/materials/material-13.png"
+    "metallic": 0
   },
   {
     "id": 14,
     "name": "大理石",
     "color": "#E0E0E0",
     "roughness": 0.3,
-    "metallic": 0,
-    "imagePath": "/materials/material-14.png"
+    "metallic": 0
   },
   {
     "id": 15,
     "name": "陶瓷",
     "color": "#F5F5F5",
     "roughness": 0.5,
-    "metallic": 0,
-    "imagePath": "/materials/material-15.png"
+    "metallic": 0
   },
   {
     "id": 16,
     "name": "皮革",
     "color": "#795548",
     "roughness": 0.8,
-    "metallic": 0,
-    "imagePath": "/materials/material-16.png"
+    "metallic": 0
   },
   {
     "id": 17,
     "name": "布料",
     "color": "#9E9E9E",
     "roughness": 1,
-    "metallic": 0,
-    "imagePath": "/materials/material-17.png"
+    "metallic": 0
   },
   {
     "id": 18,
     "name": "霓虹红",
     "color": "#FF1744",
     "roughness": 0.3,
-    "metallic": 0.5,
-    "imagePath": "/materials/material-18.png"
+    "metallic": 0.5
   },
   {
     "id": 19,
     "name": "霓虹蓝",
     "color": "#2979FF",
     "roughness": 0.3,
-    "metallic": 0.5,
-    "imagePath": "/materials/material-19.png"
+    "metallic": 0.5
   },
   {
     "id": 20,
     "name": "霓虹绿",
     "color": "#00E676",
     "roughness": 0.3,
-    "metallic": 0.5,
-    "imagePath": "/materials/material-20.png"
+    "metallic": 0.5
   },
   {
     "id": 21,
     "name": "霓虹紫",
     "color": "#D500F9",
     "roughness": 0.3,
-    "metallic": 0.5,
-    "imagePath": "/materials/material-21.png"
+    "metallic": 0.5
   },
   {
     "id": 22,
     "name": "珍珠",
     "color": "#F5F5F5",
     "roughness": 0.2,
-    "metallic": 0.8,
-    "imagePath": "/materials/material-22.png"
+    "metallic": 0.8
   },
   {
     "id": 23,
     "name": "锈金属",
     "color": "#8D6E63",
     "roughness": 0.7,
-    "metallic": 0.8,
-    "imagePath": "/materials/material-23.png"
+    "metallic": 0.8
   }
 ]

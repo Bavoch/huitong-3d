@@ -29,6 +29,8 @@ import {
 } from "../../utils/modelProcessor";
 import { preloadImages } from "../../utils/imageCache";
 import { ensureModelsBucketExists } from "../../utils/storageBuckets";
+import { MaterialThumbnail } from '../../components/MaterialThumbnail';
+import { getMaterials, Material } from '../../lib/materialStorage';
 
 export const Screen = (): JSX.Element => {
   const [models, setModels] = useState<Model[]>([]);
@@ -383,20 +385,13 @@ export const Screen = (): JSX.Element => {
   const mainContentRef = useRef<HTMLDivElement>(null);
 
   // 材质数据状态
-  const [materials, setMaterials] = useState<Array<{
-    id: number;
-    name: string;
-    color: string;
-    roughness: number;
-    metallic: number;
-    imagePath: string;
-  }>>([]);
-  const [selectedMaterialId, setSelectedMaterialId] = useState<number>(0);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string>("");
 
   // 模型上的材质状态
   const [modelMaterials, setModelMaterials] = useState<Array<{
     id: number;
-    materialId: number;
+    materialId: string;
   }>>([]);
   const [selectedModelMaterialIndex, setSelectedModelMaterialIndex] = useState<number>(0);
 
@@ -498,44 +493,77 @@ export const Screen = (): JSX.Element => {
   useEffect(() => {
     const fetchMaterials = async () => {
       try {
-        const response = await fetch('/materials/materials.json');
-        if (!response.ok) {
-          throw new Error('无法加载材质数据');
-        }
-        const data = await response.json();
-        setMaterials(data);
-        if (data.length > 0) {
-          setSelectedMaterialId(data[0].id);
-          // 应用第一个材质的属性
-          setCustomColor(data[0].color);
-          setCustomMetallic(data[0].metallic);
+        // 从本地存储加载材质数据
+        const materialsFromStorage = getMaterials();
+        if (materialsFromStorage.length === 0) {
+          // 如果本地没有数据，从默认配置加载
+          const response = await fetch('/materials/materials.json');
+          if (!response.ok) {
+            throw new Error('无法加载材质数据');
+          }
+          const data = await response.json();
+          setMaterials(data);
+          if (data.length > 0) {
+            setSelectedMaterialId(data[0].id);
+            // 应用第一个材质的属性
+            setCustomColor(data[0].color);
+            setCustomRoughness(data[0].roughness);
+            setCustomMetallic(data[0].metallic);
 
-          // 初始化模型材质
-          // 模拟一个模型有四个不同的材质部分
-          setModelMaterials([
-            { id: 1, materialId: 0 }, // 金属
-            { id: 2, materialId: 5 }, // 塑料红
-            { id: 3, materialId: 11 }, // 玻璃
-            { id: 4, materialId: 22 }  // 珍珠
-          ]);
+            // 初始化模型材质
+            // 模拟一个模型有四个不同的材质部分
+            setModelMaterials([
+              { id: 1, materialId: data[0].id }, // 默认使用第一个材质
+              { id: 2, materialId: data.length > 5 ? data[5].id : data[0].id },
+              { id: 3, materialId: data.length > 10 ? data[10].id : data[0].id },
+              { id: 4, materialId: data.length > 15 ? data[15].id : data[0].id }
+            ]);
+          }
+        } else {
+          // 直接使用从materialStorage.ts中获取的材质数据
+          setMaterials(materialsFromStorage);
+          if (materialsFromStorage.length > 0) {
+            setSelectedMaterialId(materialsFromStorage[0].id);
+            // 应用第一个材质的属性
+            setCustomColor(materialsFromStorage[0].color);
+            setCustomRoughness(materialsFromStorage[0].roughness);
+            setCustomMetallic(materialsFromStorage[0].metallic);
+
+            // 初始化模型材质
+            setModelMaterials([
+              { id: 1, materialId: materialsFromStorage[0].id }, // 默认使用第一个材质
+              { id: 2, materialId: materialsFromStorage.length > 5 ? materialsFromStorage[5].id : materialsFromStorage[0].id },
+              { id: 3, materialId: materialsFromStorage.length > 10 ? materialsFromStorage[10].id : materialsFromStorage[0].id },
+              { id: 4, materialId: materialsFromStorage.length > 15 ? materialsFromStorage[15].id : materialsFromStorage[0].id }
+            ]);
+          }
         }
       } catch (error) {
         console.error('加载材质数据失败:', error);
         // 如果加载失败，使用默认材质数据
-        const defaultMaterials = Array.from({ length: 24 }, (_, i) => ({
-          id: i,
+        // 创建符合Material类型的默认材质
+        const now = new Date().toISOString();
+        const defaultMaterials: Material[] = Array.from({ length: 5 }, (_, i) => ({
+          id: `default-${i}`,
           name: `材质 ${i+1}`,
-          color: '#FFFFFF',
+          description: null,
+          color: i === 0 ? '#FFFFFF' : i === 1 ? '#FF5252' : i === 2 ? '#4285F4' : i === 3 ? '#0F9D58' : '#FFEB3B',
           roughness: 0.5,
-          metallic: 0,
-          imagePath: `/materials/material-${i}.png`
+          metallic: i === 0 ? 1 : 0,
+          created_at: now,
+          updated_at: now
         }));
         setMaterials(defaultMaterials);
+        setSelectedMaterialId(defaultMaterials[0].id);
+        setCustomColor(defaultMaterials[0].color);
+        setCustomRoughness(defaultMaterials[0].roughness);
+        setCustomMetallic(defaultMaterials[0].metallic);
+        
         setModelMaterials([
-          { id: 1, materialId: 0 },
-          { id: 2, materialId: 1 },
-          { id: 3, materialId: 2 },
-          { id: 4, materialId: 3 }
+          { id: 1, materialId: defaultMaterials[0].id },
+          { id: 2, materialId: defaultMaterials[0].id },
+          { id: 3, materialId: defaultMaterials[0].id },
+          { id: 4, materialId: defaultMaterials[0].id }
         ]);
       }
     };
@@ -803,15 +831,16 @@ export const Screen = (): JSX.Element => {
                       }
                     }}
                   >
-                    <div
-                      className="absolute w-[27px] h-[27px] top-1.5 left-1.5 rounded-sm"
-                      style={{
-                        backgroundImage: `url(${materials.find(m => m.id === selectedMaterialId)?.imagePath || materials[0].imagePath})`,
-                        backgroundSize: 'contain',
-                        backgroundPosition: 'center',
-                        backgroundRepeat: 'no-repeat'
-                      }}
-                    />
+                    <div className="absolute w-[27px] h-[27px] top-1.5 left-1.5 rounded-sm">
+                      {materials.length > 0 && (
+                        <MaterialThumbnail 
+                          color={materials.find(m => m.id === selectedMaterialId)?.color || materials[0].color}
+                          roughness={materials.find(m => m.id === selectedMaterialId)?.roughness || materials[0].roughness}
+                          metallic={materials.find(m => m.id === selectedMaterialId)?.metallic || materials[0].metallic}
+                          size={27}
+                        />
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -868,17 +897,14 @@ export const Screen = (): JSX.Element => {
                             }
                           }}
                         >
-                          <div
-                            className="relative flex-1 self-stretch grow cursor-pointer"
-                            style={{
-                              backgroundImage: `url(${material.imagePath})`,
-                              backgroundSize: "contain",
-                              backgroundPosition: "center",
-                              backgroundRepeat: "no-repeat",
-                              filter: "brightness(1.1) contrast(1.05)"
-                            }}
-                            title={`点击应用: ${material.name}`}
-                          />
+                          <div className="relative flex-1 self-stretch grow cursor-pointer flex items-center justify-center p-1" title={`点击应用: ${material.name}`}>
+                            <MaterialThumbnail 
+                              color={material.color}
+                              roughness={material.roughness}
+                              metallic={material.metallic}
+                              size={40}
+                            />
+                          </div>
                         </div>
                       ))}
                     </div>

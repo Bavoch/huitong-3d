@@ -23,15 +23,5 @@ dist-ssr
 *.sln
 *.sw?
 
-# 3D model files
-temp/
-!public/sample-models/*.glb
-*.glb
-*.gltf
-*.obj
-*.fbx
-*.mtl
-*.bin
-
 # Temporary files
 .temp/

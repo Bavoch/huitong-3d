@@ -4,6 +4,7 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Card, CardContent } from "../../components/ui/card";
 import { PlusIcon, TrashIcon, SearchIcon, EditIcon, SaveIcon, XIcon } from "lucide-react";
+import { MaterialThumbnail } from "../../components/MaterialThumbnail";
 
 export const MaterialsManagement = (): JSX.Element => {
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -208,15 +209,14 @@ export const MaterialsManagement = (): JSX.Element => {
               
               <div className="space-y-4">
                 {/* 预览 */}
-                <div className="bg-gray-50 rounded-lg p-2 flex flex-col items-center mb-2 border border-gray-200">
-                  <h4 className="text-sm font-medium text-gray-600 mb-2">预览</h4>
-                  <div 
-                    className="w-24 h-24 rounded-lg shadow-sm" 
-                    style={{ 
-                      backgroundColor: formColor,
-                      opacity: 1 - formRoughness * 0.5,
-                      filter: `brightness(${1 + formMetallic * 0.5})`,
-                    }} 
+                <div className="bg-gray-50 rounded-lg p-4 flex flex-col items-center mb-2 border border-gray-200">
+                  <h4 className="text-sm font-medium text-gray-600 mb-3">材质预览</h4>
+                  <MaterialThumbnail 
+                    color={formColor}
+                    roughness={formRoughness}
+                    metallic={formMetallic}
+                    size={120}
+                    className="border border-gray-200 shadow-lg"
                   />
                 </div>
                 
@@ -269,78 +269,99 @@ export const MaterialsManagement = (): JSX.Element => {
         </Card>
       )}
       
-      {!isCreating && !editingMaterial && filteredMaterials.length === 0 && (
-        <div className="text-center py-8">
-          <p className="text-gray-500">
-            {search ? '没有找到匹配的材质' : '暂无添加的材质，请点击新建材质按钮添加'}
-          </p>
+      {!isCreating && !editingMaterial && (
+        <div className="space-y-6">
+          {filteredMaterials.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">
+                {search ? '没有找到匹配的材质' : '暂无添加的材质，请点击新建材质按钮添加'}
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      颜色
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      名称
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      描述
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      粗糙度
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      金属度
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      更新时间
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      操作
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredMaterials.map((material) => (
+                    <tr key={material.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex justify-center">
+                          <MaterialThumbnail 
+                            color={material.color}
+                            roughness={material.roughness}
+                            metallic={material.metallic}
+                            size={40}
+                            className="border border-gray-200 shadow-sm"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{material.name}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-500 max-w-xs truncate" title={material.description || ''}>
+                          {material.description || '-'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{material.roughness}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{material.metallic}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">
+                          {new Date(material.updated_at || '').toLocaleString()}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={() => startEditing(material)}
+                          className="text-blue-600 hover:text-blue-900 mr-4"
+                          title="编辑"
+                        >
+                          <EditIcon className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteMaterial(material.id)}
+                          className="text-red-600 hover:text-red-900"
+                          title="删除"
+                        >
+                          <TrashIcon className="h-5 w-5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
-      
-      {/* 材质列表 */}
-      <div className="grid grid-cols-3 gap-4">
-        {filteredMaterials.map(material => (
-          <Card key={material.id} className="bg-white border-gray-200 shadow-sm hover:shadow transition-shadow">
-            <CardContent className="p-4">
-              <div className="flex justify-between items-start mb-3">
-                <h3 className="text-lg font-medium text-gray-800 truncate" title={material.name}>
-                  {material.name}
-                </h3>
-                <div className="flex space-x-2">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-8 w-8 p-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
-                    onClick={() => startEditing(material)}
-                  >
-                    <EditIcon className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
-                    onClick={() => handleDeleteMaterial(material.id)}
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              
-              {material.description && (
-                <p className="text-gray-500 text-sm line-clamp-2 mb-3" title={material.description}>
-                  {material.description}
-                </p>
-              )}
-              
-              <div className="flex space-x-4 items-center">
-                <div
-                  className="w-12 h-12 rounded-lg shadow-sm border border-gray-100"
-                  style={{
-                    backgroundColor: material.color,
-                    opacity: 1 - material.roughness * 0.5,
-                    filter: `brightness(${1 + material.metallic * 0.5})`,
-                  }}
-                />
-                
-                <div className="space-y-1 flex-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-500">颜色:</span>
-                    <span className="text-gray-700">{material.color.toUpperCase()}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-500">粗糙度:</span>
-                    <span className="text-gray-700">{material.roughness.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-500">金属度:</span>
-                    <span className="text-gray-700">{material.metallic.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
     </div>
   );
 };

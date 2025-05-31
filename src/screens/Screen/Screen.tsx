@@ -29,7 +29,7 @@ import {
 } from "../../utils/modelProcessor";
 import { preloadImages } from "../../utils/imageCache";
 import { ensureModelsBucketExists } from "../../utils/storageBuckets";
-import { MaterialThumbnail, captureMaterialThumbnail } from '../../components/MaterialThumbnail';
+import { MaterialThumbnail } from '../../components/MaterialThumbnail';
 import { toast } from '../../components/ui/toast';
 import { getMaterials, Material } from '../../lib/materialStorage';
 import { base64ToBlob, extractMimeType } from '../../utils/blobUtils';
@@ -619,11 +619,12 @@ export const Screen = (): JSX.Element => {
         />
 
         <div className="inline-flex items-center justify-end gap-2 relative">
-          <Button
+              <Button
             variant="ghost"
             className="h-8 inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
             onClick={() => {
-              const dataUrl = captureMaterialThumbnail();
+              // 使用模型的截图功能
+              const dataUrl = (window as any).captureModelScreenshot ? (window as any).captureModelScreenshot() : null;
               if (dataUrl) {
                 // 将图片数据复制到剪贴板
                 // 创建一个临时的canvas元素
@@ -659,7 +660,7 @@ export const Screen = (): JSX.Element => {
                 };
                 img.src = dataUrl;
               } else {
-                toast.error('无法获取材质预览图片');
+                toast.error('无法获取模型渲染图片');
               }
             }}
           >
@@ -673,17 +674,18 @@ export const Screen = (): JSX.Element => {
             variant="default"
             className="h-8 inline-flex items-center justify-center gap-1 px-3 py-1.5 btn-primary rounded-lg"
             onClick={() => {
-              const dataUrl = captureMaterialThumbnail();
+              // 使用模型的截图功能
+              const dataUrl = (window as any).captureModelScreenshot ? (window as any).captureModelScreenshot() : null;
               if (dataUrl) {
                 // 创建一个下载链接
                 const a = document.createElement('a');
                 a.href = dataUrl;
-                a.download = `材质_${new Date().getTime()}.png`;
+                a.download = `模型渲染_${new Date().getTime()}.png`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
               } else {
-                toast.error('无法获取材质预览图片');
+                toast.error('无法获取模型渲染图片');
               }
             }}
           >

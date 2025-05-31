@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
+import { toast } from '../../components/ui/toast';
 import { getModels, saveModel, deleteModel, Model } from "../../lib/localStorage";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { UploadIcon, TrashIcon, SearchIcon } from "lucide-react";
 import { validateModelFile, processModelFile, generateModelThumbnail } from "../../utils/modelProcessor";
-import { readFileAsDataURL } from "../../utils/fileUtils";
 
 export const ModelsManagement = (): JSX.Element => {
   const [models, setModels] = useState<Model[]>([]);
@@ -46,7 +46,7 @@ export const ModelsManagement = (): JSX.Element => {
       // 验证文件
       const isValid = await validateModelFile(file);
       if (!isValid) {
-        alert('请上传有效的3D模型文件（.glb, .gltf, .obj, .fbx）');
+        toast.error('请上传有效的3D模型文件（.glb, .gltf, .obj, .fbx）');
         setLoading(false);
         return;
       }
@@ -54,39 +54,59 @@ export const ModelsManagement = (): JSX.Element => {
       // 处理模型文件
       const { processedFile, metadata } = await processModelFile(file);
 
-      // 将处理后的文件转换为Data URL进行持久化存储
-      const fileDataURL = await readFileAsDataURL(processedFile);
-
-      // 生成缩略图 (仍然可以使用原始的processedFile或其Blob URL进行thumbnail生成，因为这只是临时的)
-      // 为了保持一致性，如果generateModelThumbnail接受Data URL更好，但当前它接受URL字符串
-      // 我们需要一个临时的Blob URL来生成缩略图，或者修改generateModelThumbnail
-      // 暂时，我们先用转换后的Data URL尝试，如果不行再调整
-      // 注意：如果模型文件很大，fileDataURL也会很大，可能影响缩略图生成性能
-      const thumbnailDataUrl = await generateModelThumbnail(fileDataURL); // 尝试使用Data URL
-
+      // 生成缩略图
+      const blobUrl = URL.createObjectURL(processedFile);
+      const thumbnailDataUrl = await generateModelThumbnail(blobUrl);
+      URL.revokeObjectURL(blobUrl); // 释放临时URL
+      
       // 如果缩略图生成失败，可以给一个默认的或者null
       const finalThumbnailUrl = thumbnailDataUrl || ''; // 或者一个默认占位图的URL
 
-      // 创建新的模型对象
+      // 上传到服务器
+      const formData = new FormData();
+      formData.append('modelFile', processedFile, fileName);
+      
+      // 服务器URL - 根据实际部署环境调整
+      const serverUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+        ? `http://${window.location.hostname}:9000/api/upload-model`
+        : '/api/upload-model';
+      
+      const response = await fetch(serverUrl, {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!response.ok) {
+        throw new Error(`服务器响应错误: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || '上传失败');
+      }
+      
+      // 创建新的模型对象，现在使用服务器返回的文件路径
       const currentTime = new Date().toISOString();
       const newModel: Model = {
         id: `model-${Date.now()}`,
         name: fileName,
-        file_path: fileDataURL,
+        // 使用服务器返回的文件路径，而不是Base64数据
+        file_path: result.filePath,
         description: `上传的模型: ${fileName} (${(metadata.processedSize / (1024 * 1024)).toFixed(2)}MB)`,
         thumbnail_url: finalThumbnailUrl,
         created_at: currentTime,
         updated_at: currentTime
       };
 
-      // 保存模型
+      // 保存模型元数据到localStorage
       saveModel(newModel);
       fetchModels();
       
-      alert('模型上传成功!');
+      toast.success('模型上传成功!');
     } catch (error) {
       console.error('上传模型时出错:', error);
-      alert('上传模型时出错，请重试');
+      toast.error(`上传模型时出错: ${error instanceof Error ? error.message : '请重试'}`);
     } finally {
       setLoading(false);
       // 重置文件输入，以便再次选择同一文件

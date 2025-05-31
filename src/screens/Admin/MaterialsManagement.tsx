@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { toast } from '../../components/ui/toast';
 import { getMaterials, saveMaterial, deleteMaterial, Material } from "../../lib/materialStorage";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -69,7 +70,7 @@ export const MaterialsManagement = (): JSX.Element => {
   // 保存材质
   const saveMaterialData = () => {
     if (!formName.trim()) {
-      alert('请输入材质名称');
+      toast.error('请输入材质名称');
       return;
     }
     
@@ -89,7 +90,7 @@ export const MaterialsManagement = (): JSX.Element => {
       };
       
       saveMaterial(newMaterial);
-      alert('材质创建成功!');
+      toast.success('材质创建成功!');
     } else if (editingMaterial) {
       // 更新现有材质
       const updatedMaterial: Material = {
@@ -103,7 +104,7 @@ export const MaterialsManagement = (): JSX.Element => {
       };
       
       saveMaterial(updatedMaterial);
-      alert('材质更新成功!');
+      toast.success('材质更新成功!');
     }
     
     // 重置状态并刷新列表

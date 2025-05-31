@@ -29,7 +29,8 @@ import {
 } from "../../utils/modelProcessor";
 import { preloadImages } from "../../utils/imageCache";
 import { ensureModelsBucketExists } from "../../utils/storageBuckets";
-import { MaterialThumbnail } from '../../components/MaterialThumbnail';
+import { MaterialThumbnail, captureMaterialThumbnail } from '../../components/MaterialThumbnail';
+import { toast } from '../../components/ui/toast';
 import { getMaterials, Material } from '../../lib/materialStorage';
 import { base64ToBlob, extractMimeType } from '../../utils/blobUtils';
 
@@ -48,16 +49,27 @@ export const Screen = (): JSX.Element => {
   const [effectiveModel, setEffectiveModel] = useState<Model | null>(null);
 
   useEffect(() => {
-    let objectUrl: string | null = null; // To store the blob URL for cleanup
+    let objectUrl: string | null = null; // 存储 blob URL 以便清理
 
     if (currentModel && currentModel.file_path) {
       if (currentModel.file_path.startsWith('data:')) {
+        // 处理旧版 Base64 数据 URL
         const mimeType = extractMimeType(currentModel.file_path) || 'application/octet-stream';
         const blob = base64ToBlob(currentModel.file_path, mimeType);
         objectUrl = URL.createObjectURL(blob);
         setEffectiveModel({ ...currentModel, file_path: objectUrl });
+      } else if (currentModel.file_path.startsWith('/models/')) {
+        // 处理服务器上的模型文件
+        // 确定基础URL
+        const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+          ? `http://${window.location.hostname}:9000`
+          : '';
+        
+        const fullPath = `${baseUrl}${currentModel.file_path}`;
+        console.log('加载服务器模型路径:', fullPath);
+        setEffectiveModel({ ...currentModel, file_path: fullPath });
       } else {
-        // It's already a usable URL (e.g., a blob: URL from a direct upload preview, or a future http URL)
+        // 其他URL类型 (例如 blob: URL 或 HTTP URL)
         setEffectiveModel(currentModel);
       }
     } else {
@@ -110,13 +122,13 @@ export const Screen = (): JSX.Element => {
     // 使用模型处理工具验证文件
     const isValid = await validateModelFile(file);
     if (!isValid) {
-      alert('请上传有效的3D模型文件（.glb, .gltf, .obj, .fbx）');
+      toast.error('请上传有效的3D模型文件（.glb, .gltf, .obj, .fbx）');
       return;
     }
 
     // 检查文件大小
     if (!checkFileSize(file, 50)) {
-      alert('文件大小超过限制（最大50MB）');
+      toast.error('文件大小超过限制（最大50MB）');
       return;
     }
 
@@ -176,14 +188,14 @@ export const Screen = (): JSX.Element => {
         // 模型上传成功
       } catch (uploadError) {
         console.error('上传过程中出错:', uploadError);
-        alert('上传过程中出错，请稍后重试');
+        toast.error('上传过程中出错，请稍后重试');
 
         // 清理本地资源
         URL.revokeObjectURL(fileURL);
       }
     } catch (processingError) {
       console.error('处理模型文件时出错:', processingError);
-      alert('处理模型文件时出错，请尝试其他文件');
+      toast.error('处理模型文件时出错，请尝试其他文件');
     }
 
     // 清空文件输入，允许再次上传相同文件
@@ -611,7 +623,44 @@ export const Screen = (): JSX.Element => {
             variant="ghost"
             className="h-8 inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
             onClick={() => {
-              alert('截图功能已禁用');
+              const dataUrl = captureMaterialThumbnail();
+              if (dataUrl) {
+                // 将图片数据复制到剪贴板
+                // 创建一个临时的canvas元素
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                if (!tempCtx) {
+                  toast.error('无法创建临时画布，复制失败');
+                  return;
+                }
+                
+                // 创建一个新的图像对象
+                const img = new Image();
+                img.onload = () => {
+                  // 设置canvas大小与图像相同
+                  tempCanvas.width = img.width;
+                  tempCanvas.height = img.height;
+                  // 绘制图像到canvas
+                  tempCtx.drawImage(img, 0, 0);
+                  
+                  // 尝试复制到剪贴板
+                  tempCanvas.toBlob(blob => {
+                    if (blob) {
+                      // 创建ClipboardItem
+                      const item = new ClipboardItem({ 'image/png': blob });
+                      navigator.clipboard.write([item])
+                        .then(() => toast.success('图片已复制到剪贴板'))
+                        .catch(err => {
+                          console.error('复制到剪贴板失败:', err);
+                          toast.error('复制到剪贴板失败，可能是浏览器权限问题');
+                        });
+                    }
+                  }, 'image/png');
+                };
+                img.src = dataUrl;
+              } else {
+                toast.error('无法获取材质预览图片');
+              }
             }}
           >
             <CopyIcon className="w-4 h-4 text-[#ffffffb2]" />
@@ -624,7 +673,18 @@ export const Screen = (): JSX.Element => {
             variant="default"
             className="h-8 inline-flex items-center justify-center gap-1 px-3 py-1.5 btn-primary rounded-lg"
             onClick={() => {
-              alert('截图功能已禁用');
+              const dataUrl = captureMaterialThumbnail();
+              if (dataUrl) {
+                // 创建一个下载链接
+                const a = document.createElement('a');
+                a.href = dataUrl;
+                a.download = `材质_${new Date().getTime()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+              } else {
+                toast.error('无法获取材质预览图片');
+              }
             }}
           >
             <DownloadIcon className="w-4 h-4" />

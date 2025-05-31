@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import { getModels, saveModel, deleteModel, Model } from "../../lib/localStorage";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
-import { Card, CardContent } from "../../components/ui/card";
 import { UploadIcon, TrashIcon, SearchIcon } from "lucide-react";
 import { validateModelFile, processModelFile, generateModelThumbnail } from "../../utils/modelProcessor";
+import { readFileAsDataURL } from "../../utils/fileUtils";
 
 export const ModelsManagement = (): JSX.Element => {
   const [models, setModels] = useState<Model[]>([]);
@@ -14,12 +14,15 @@ export const ModelsManagement = (): JSX.Element => {
   
   // 初始化时获取模型列表
   useEffect(() => {
+    console.log('ModelsManagement: useEffect triggered, calling fetchModels.');
     fetchModels();
   }, []);
   
   // 获取模型列表
   const fetchModels = () => {
+    console.log('ModelsManagement: fetchModels called.');
     const modelsList = getModels();
+    console.log('ModelsManagement: Models from localStorage:', modelsList);
     setModels(modelsList);
   };
   
@@ -51,20 +54,27 @@ export const ModelsManagement = (): JSX.Element => {
       // 处理模型文件
       const { processedFile, metadata } = await processModelFile(file);
 
-      // 创建文件URL用于本地预览
-      const fileURL = URL.createObjectURL(processedFile);
+      // 将处理后的文件转换为Data URL进行持久化存储
+      const fileDataURL = await readFileAsDataURL(processedFile);
 
-      // 生成缩略图
-      const thumbnailDataUrl = await generateModelThumbnail(fileURL);
+      // 生成缩略图 (仍然可以使用原始的processedFile或其Blob URL进行thumbnail生成，因为这只是临时的)
+      // 为了保持一致性，如果generateModelThumbnail接受Data URL更好，但当前它接受URL字符串
+      // 我们需要一个临时的Blob URL来生成缩略图，或者修改generateModelThumbnail
+      // 暂时，我们先用转换后的Data URL尝试，如果不行再调整
+      // 注意：如果模型文件很大，fileDataURL也会很大，可能影响缩略图生成性能
+      const thumbnailDataUrl = await generateModelThumbnail(fileDataURL); // 尝试使用Data URL
+
+      // 如果缩略图生成失败，可以给一个默认的或者null
+      const finalThumbnailUrl = thumbnailDataUrl || ''; // 或者一个默认占位图的URL
 
       // 创建新的模型对象
       const currentTime = new Date().toISOString();
       const newModel: Model = {
         id: `model-${Date.now()}`,
         name: fileName,
-        file_path: fileURL,
+        file_path: fileDataURL,
         description: `上传的模型: ${fileName} (${(metadata.processedSize / (1024 * 1024)).toFixed(2)}MB)`,
-        thumbnail_url: thumbnailDataUrl,
+        thumbnail_url: finalThumbnailUrl,
         created_at: currentTime,
         updated_at: currentTime
       };

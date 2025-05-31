@@ -51,21 +51,31 @@ function createMaterialPreview(material, index) {
   const b = parseInt(material.color.slice(5, 7), 16);
   
   // 创建径向渐变来模拟材质球
-  const gradient = ctx.createRadialGradient(size * 0.3, size * 0.3, 0, size * 0.5, size * 0.5, size * 0.7);
+  const gradient = ctx.createRadialGradient(
+    size * 0.4, size * 0.4, size * 0.1, 
+    size * 0.5, size * 0.5, size * 0.7
+  );
   
-  // 高光
+  // 根据材质属性调整光照
   const highlightIntensity = 1 - material.roughness;
   const metallicFactor = material.metallic;
+  
+  // 主光源颜色
+  const mainLight = `rgb(${Math.min(255, r + 100)}, ${Math.min(255, g + 100)}, ${Math.min(255, b + 100)})`;
   
   // 金属材质有色彩反射，非金属材质高光是白色的
   const highlightColor = metallicFactor > 0.5 
     ? `rgba(${r + (255 - r) * 0.7}, ${g + (255 - g) * 0.7}, ${b + (255 - b) * 0.7}, ${highlightIntensity})`
     : `rgba(255, 255, 255, ${highlightIntensity})`;
   
+  // 环境光影响
+  const ambientColor = `rgb(${r * 0.8}, ${g * 0.8}, ${b * 0.8})`;
+  
   // 设置渐变颜色
   gradient.addColorStop(0, highlightColor);
-  gradient.addColorStop(0.3, material.color);
-  gradient.addColorStop(1, `rgb(${r * 0.5}, ${g * 0.5}, ${b * 0.5})`);
+  gradient.addColorStop(0.2, mainLight);
+  gradient.addColorStop(0.5, material.color);
+  gradient.addColorStop(1, ambientColor);
   
   // 绘制材质球
   ctx.fillStyle = gradient;

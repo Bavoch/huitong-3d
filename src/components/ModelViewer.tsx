@@ -1,7 +1,8 @@
-import React, { useRef, useEffect, useState, Suspense, useCallback } from 'react';
+import React, { useRef, useEffect, useState, Suspense, useCallback, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, useGLTF, Html, Environment } from '@react-three/drei';
+import { OrbitControls, Html, Environment } from '@react-three/drei';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { type Model } from '../lib/localStorage';
 
 // 改进的加载指示器组件，显示进度和阶段
@@ -31,8 +32,6 @@ function LoadingIndicator({ progress = 0, stage = '准备中' }: { progress?: nu
     </group>
   );
 }
-
-
 
 // 默认模型组件 - 当没有实际模型时显示一个基础几何体
 function DefaultModel() {
@@ -72,8 +71,28 @@ function ModelLoader({
   const [loadAttempts, setLoadAttempts] = useState<number>(0);
   const previousPathRef = useRef<string>('');
 
+  // 规范化模型路径，删除前导斜杠
+  const getNormalizedPath = (path: string | null): string | null => {
+    if (!path) return null;
+    // 如果是 /blob: 开头，删除前导斜杠
+    if (path.startsWith('/blob:')) {
+      return path.substring(1); // 移除前导斜杠
+    }
+    return path;
+  };
+
+  // 计算规范化的路径
+  const normalizedPath = useMemo(() => {
+    const normalized = getNormalizedPath(modelPath);
+    if (normalized && normalized !== modelPath) {
+      console.log("规范化路径 - 原始:", modelPath, "规范化后:", normalized);
+    }
+    return normalized;
+  }, [modelPath]);
+
   // 尝试加载模型
   useEffect(() => {
+    console.log("ModelViewer: modelPath/loadAttempts useEffect. modelPath:", modelPath, "normalizedPath:", normalizedPath, "Attempts:", loadAttempts);
     // 检查模型路径是否变化
     const isPathChanged = previousPathRef.current !== modelPath;
     previousPathRef.current = modelPath;
@@ -84,7 +103,7 @@ function ModelLoader({
     }
 
     // 如果没有提供模型路径，使用默认模型
-    if (!modelPath) {
+    if (!normalizedPath) {
       setUseDefaultModel(true);
       return;
     }
@@ -98,7 +117,7 @@ function ModelLoader({
     setModelKey(`${modelPath}_${Date.now()}_attempt_${loadAttempts}`);
 
     // 检查模型路径是否为Blob URL（上传的文件）
-    if (!modelPath.startsWith('blob:')) {
+    if (!normalizedPath.startsWith('blob:')) {
       // 对于非Blob URL，检查路径是否有效
       try {
         // 检查文件扩展名
@@ -118,8 +137,6 @@ function ModelLoader({
       }
     }
   }, [modelPath, loadAttempts]);
-
-  // 移除了旋转动画逻辑
 
   // 处理模型加载错误
   const handleModelError = useCallback(() => {
@@ -202,6 +219,24 @@ function ModelObject({
   const [retryCount, setRetryCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const maxRetries = 2; // 最大重试次数
+  
+  // 规范化模型路径函数
+  const getNormalizedPath = (path: string | null): string | null => {
+    if (!path) return null;
+    if (path.startsWith('/blob:')) {
+      return path.substring(1); // 移除前导斜杠
+    }
+    return path;
+  };
+
+  // 计算规范化的路径
+  const normalizedPath = useMemo(() => {
+    const normalized = getNormalizedPath(modelPath);
+    if (normalized && normalized !== modelPath) {
+      console.log("ModelObject: 规范化路径 - 原始:", modelPath, "规范化后:", normalized);
+    }
+    return normalized || '';
+  }, [modelPath]);
 
   // 清理函数 - 用于清理资源
   const cleanupResources = useCallback(() => {
@@ -287,7 +322,7 @@ function ModelObject({
           };
 
           // 创建 GLTFLoader
-          const loader = new THREE.FileLoader(manager);
+          const loader = new GLTFLoader(manager);
 
           // 添加超时处理
           const timeoutId = setTimeout(() => {
@@ -295,42 +330,44 @@ function ModelObject({
           }, 10000); // 10秒超时
 
           // 开始加载
+          console.log('开始加载模型:', url);
           loader.load(
             url,
-            (_) => {
+            (gltf: any) => {
               // 清除超时
               clearTimeout(timeoutId);
+              console.log('模型加载成功:', url, gltf);
 
-              // 文件已下载，现在使用 useGLTF 加载模型
+              // GLTF模型已加载
               if (isMounted) {
-                setLoadProgress(85);
-                setLoadStage('解析中');
-
+                setLoadProgress(95);
+                setLoadStage('处理中');
+                
                 try {
-                  // 使用 useGLTF 加载模型
-                  useGLTF.preload(url);
-                  const gltf = useGLTF(url);
-
-                  if (isMounted) {
-                    setLoadProgress(95);
-                    setLoadStage('处理中');
+                  // 使用加载好的GLTF模型
+                  if (gltf && gltf.scene) {
                     resolve(gltf.scene);
+                  } else {
+                    reject(new Error('加载的模型没有场景'));
                   }
                 } catch (error) {
                   reject(error);
                 }
+              } else {
+                reject(new Error('组件已卸载'));
               }
             },
             // 进度回调
-            (xhr) => {
+            (xhr: any) => {
               if (xhr.lengthComputable && isMounted) {
                 const progress = Math.min(Math.round((xhr.loaded / xhr.total) * 80), 80);
                 setLoadProgress(progress);
               }
             },
             // 错误回调
-            (error) => {
+            (error: any) => {
               clearTimeout(timeoutId);
+              console.error('模型加载错误:', url, error);
               reject(error);
             }
           );
@@ -343,15 +380,39 @@ function ModelObject({
         // 使用进度跟踪器加载模型
         let gltfScene;
 
-        // 对于本地文件路径，确保以 / 开头
-        let modelUrl = modelPath;
-        if (!modelPath.startsWith('blob:') && !modelPath.startsWith('http')) {
-          // 确保路径以 / 开头
-          modelUrl = modelPath.startsWith('/') ? modelPath : `/${modelPath}`;
+        // 使用规范化后的路径
+        let modelUrl = normalizedPath;
+        console.log('加载模型函数 - 原始路径:', modelPath, '规范化后路径:', normalizedPath);
+        
+        // 检查URL格式
+        if (!modelUrl) {
+          throw new Error('模型路径为空');
         }
         
-        // 使用进度跟踪器加载模型
-        gltfScene = await createProgressTracker(modelUrl);
+        // 处理不同类型的URL
+        if (!modelUrl.startsWith('blob:') && !modelUrl.startsWith('http')) {
+          // 对于本地文件路径，确保以 / 开头
+          modelUrl = modelUrl.startsWith('/') ? modelUrl : `/${modelUrl}`;
+          console.log('规范化后的模型路径:', modelUrl);
+        } else {
+          console.log('使用blob/http模型路径:', modelUrl);
+        }
+        
+        // 使用进度跟踪器加载模型，添加超时保护
+        const loadPromise = createProgressTracker(modelUrl);
+        
+        // 创建超时Promise
+        const timeoutPromise = new Promise<THREE.Group>((_, reject) => {
+          setTimeout(() => reject(new Error('模型加载全局超时')), 20000); // 20秒全局超时
+        });
+        
+        // 使用Promise.race竞争，谁先完成就用谁的结果
+        try {
+          gltfScene = await Promise.race([loadPromise, timeoutPromise]);
+        } catch (error) {
+          console.error('模型加载出错或超时:', error);
+          throw error; // 重新抛出错误，让外层catch捕获
+        }
 
         if (!isMounted) return;
 
@@ -409,7 +470,7 @@ function ModelObject({
           throw new Error('模型加载失败: 无效的场景');
         }
       } catch (error) {
-        console.error('加载模型失败:', error);
+        console.error('加载模型失败:', error instanceof Error ? error.message : error);
         if (isMounted) {
           if (retryCount < maxRetries) {
             // 加载失败，自动重试
@@ -553,7 +614,8 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
         }
 
         // 检查文件扩展名
-        const fileExtension = filePath.split('.').pop()?.toLowerCase();
+        const originalFileName = selectedModel.name; // Get the original filename
+        const fileExtension = originalFileName.split('.').pop()?.toLowerCase(); // Extract extension from original name
 
         // 检查是否为支持的格式
         const isValidFormat = ['glb', 'gltf'].includes(fileExtension || '');
@@ -702,74 +764,26 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
   // 创建默认摄像机
   useEffect(() => {
     if (!defaultCameraRef.current) {
-      defaultCameraRef.current = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-      // 设置默认摄像机位置，从斜上方45度角观察
-      defaultCameraRef.current.position.set(5, 5, 5);
+      // 设置更合适的视野角度和远近裁剪面
+      defaultCameraRef.current = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+      // 设置默认摄像机位置，从斜上方45度角观察，距离稍远以获得更好的视角
+      defaultCameraRef.current.position.set(3, 3, 3);
       defaultCameraRef.current.lookAt(0, 0, 0);
     }
   }, []);
 
   // 恢复默认视图
   const resetToDefaultView = useCallback(() => {
-    if (controlsRef.current && defaultCameraRef.current) {
-      // 如果有模型，确保模型居中
-      if (sceneRef.current) {
-        // 查找模型对象
-        let modelGroup: THREE.Group | null = null;
-        sceneRef.current.traverse((object) => {
-          // 检查是否为Group类型
-          if (object instanceof THREE.Group) {
-            // 检查是否为置于场景中的模型对象，而非场景本身
-            if (sceneRef.current && object.uuid !== sceneRef.current.uuid) {
-              modelGroup = object;
-            }
-          }
-        });
-
-        if (modelGroup) {
-          // 计算包围盒
-          const box = new THREE.Box3().setFromObject(modelGroup);
-          const center = box.getCenter(new THREE.Vector3());
-          const size = box.getSize(new THREE.Vector3());
-
-          // 重置模型位置
-          const maxDim = Math.max(size.x, size.y, size.z);
-          const scale = 2 / maxDim; // 缩放到合适的大小
-
-          // 更新模型比例和位置
-          if (modelGroup) {
-            // 使用显式类型断言以避免 TypeScript 错误
-            const group = modelGroup as THREE.Group;
-            group.scale.set(scale, scale, scale);
-            group.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
-            group.rotation.set(0, 0, 0);
-          }
-
-          // 计算适合模型的摄像机位置
-          const distance = maxDim * 1.5;
-          if (defaultCameraRef.current) {
-            defaultCameraRef.current.position.set(distance, distance, distance);
-            defaultCameraRef.current.lookAt(0, 0, 0);
-          }
-        } else {
-          // 如果没有模型，使用默认摄像机位置
-          if (defaultCameraRef.current) {
-            defaultCameraRef.current.position.set(5, 5, 5);
-            defaultCameraRef.current.lookAt(0, 0, 0);
-          }
-        }
-
-        // 更新当前摄像机到默认摄像机的位置和朝向
-        if (cameraRef.current) {
-          cameraRef.current.position.copy(defaultCameraRef.current.position);
-          cameraRef.current.rotation.copy(defaultCameraRef.current.rotation);
-        }
-      }
-
-      // 重置控制器
+    if (controlsRef.current && defaultCameraRef.current && cameraRef.current) {
+      // 重置控制器到初始位置
       controlsRef.current.reset();
+      
+      // 设置相机到默认位置
+      cameraRef.current.position.copy(defaultCameraRef.current.position);
+      cameraRef.current.rotation.copy(defaultCameraRef.current.rotation);
+      cameraRef.current.updateProjectionMatrix();
     }
-  }, [controlsRef, sceneRef, cameraRef]);
+  }, [controlsRef, cameraRef]);
 
   // 将渲染器引用暴露给父组件
   useEffect(() => {

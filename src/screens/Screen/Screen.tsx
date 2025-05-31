@@ -31,6 +31,7 @@ import { preloadImages } from "../../utils/imageCache";
 import { ensureModelsBucketExists } from "../../utils/storageBuckets";
 import { MaterialThumbnail } from '../../components/MaterialThumbnail';
 import { getMaterials, Material } from '../../lib/materialStorage';
+import { base64ToBlob, extractMimeType } from '../../utils/blobUtils';
 
 export const Screen = (): JSX.Element => {
   const [models, setModels] = useState<Model[]>([]);
@@ -44,6 +45,31 @@ export const Screen = (): JSX.Element => {
   const [processingThumbnails, setProcessingThumbnails] = useState(false);
   const [clickCount, setClickCount] = useState(0);
   const clickTimeoutRef = useRef<NodeJS.Timeout>();
+  const [effectiveModel, setEffectiveModel] = useState<Model | null>(null);
+
+  useEffect(() => {
+    let objectUrl: string | null = null; // To store the blob URL for cleanup
+
+    if (currentModel && currentModel.file_path) {
+      if (currentModel.file_path.startsWith('data:')) {
+        const mimeType = extractMimeType(currentModel.file_path) || 'application/octet-stream';
+        const blob = base64ToBlob(currentModel.file_path, mimeType);
+        objectUrl = URL.createObjectURL(blob);
+        setEffectiveModel({ ...currentModel, file_path: objectUrl });
+      } else {
+        // It's already a usable URL (e.g., a blob: URL from a direct upload preview, or a future http URL)
+        setEffectiveModel(currentModel);
+      }
+    } else {
+      setEffectiveModel(null);
+    }
+
+    return () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [currentModel]);
 
   // 处理logo点击事件
   const handleLogoClick = useCallback(() => {
@@ -233,47 +259,17 @@ export const Screen = (): JSX.Element => {
     }
   };
 
-  // 清除现有的所有本地存储数据
-  const clearLocalStorage = () => {
-    // 清除所有相关的本地存储项
-    localStorage.removeItem('huitong3d_models');
-    localStorage.removeItem('models');
-    localStorage.removeItem('furniture_models');
-    localStorage.removeItem('active_model');
-    localStorage.removeItem('model_cache');
-    console.log('已清除本地存储中的模型数据');
-  };
-  
   // 从本地存储获取模型数据
   const fetchModels = async () => {
     setLoading(true);
     try {
-      // 清除旧数据，解决模型路径问题
-      clearLocalStorage();
-      
       // 检查存储桶是否存在，对于本地存储来说总是存在的
       await ensureModelsBucketExists();
 
       // 从本地存储获取模型
       let localModels = getModels();
       
-      // 如果本地存储中没有模型，添加默认的 duck.glb 模型
-      if (localModels.length === 0) {
-        const defaultModel: Model = {
-          id: 'default-model',
-          name: '会通示例模型',
-          file_path: '/models/blenderco_cn.glb',
-          description: '会通3D示例默认模型',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          thumbnail_url: '/models/blenderco_cn-thumbnail.png'
-        };
-        
-        // 保存默认模型到本地存储
-        saveModel(defaultModel);
-        localModels = [defaultModel];
-      }
-      
+
       if (localModels.length > 0) {
         setModels(localModels);
 
@@ -309,6 +305,8 @@ export const Screen = (): JSX.Element => {
         }
       } else {
         setModels([]);
+        setCurrentModel(null);
+        setSelectedModel("");
         setModelsNeedingThumbnails([]);
       }
     } catch (error) {
@@ -370,7 +368,7 @@ export const Screen = (): JSX.Element => {
   // 首次加载时获取模型数据
   useEffect(() => {
     // 在组件初始化时主动清理所有本地存储数据
-    clearLocalStorage();
+    // clearLocalStorage(); // 自动清除本地存储，导致模型丢失，暂时注释掉
     
     // 设置一个短暂的延时，确保清理完成后再获取模型
     setTimeout(() => {
@@ -642,9 +640,9 @@ export const Screen = (): JSX.Element => {
         {/* 3D Preview Area */}
         <Card className="relative flex-1 bg-[#ffffff0d] rounded-2xl overflow-hidden border-0 h-full">
           <CardContent className="p-0 h-full relative">
-            {currentModel ? (
+            {effectiveModel ? (
               <ModelViewer
-                selectedModel={currentModel}
+                selectedModel={effectiveModel}
                 customColor={customColor}
                 customRoughness={customRoughness}
                 customMetallic={customMetallic}

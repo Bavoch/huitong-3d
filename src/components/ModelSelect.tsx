@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Model } from '../lib/supabase';
 import { ChevronDownIcon } from 'lucide-react';
-import ModelThumbnail from './ModelThumbnail';
 import ModelSelectionModal from './ModelSelectionModal';
 
 interface ModelSelectProps {
@@ -49,14 +48,8 @@ const ModelSelect: React.FC<ModelSelectProps> = ({
         onClick={() => setIsModalOpen(true)}
       >
         {currentModel ? (
-          <div className="flex items-center gap-2 overflow-hidden flex-1">
-            <ModelThumbnail
-              id={currentModel.id}
-              thumbnailUrl={currentModel.thumbnail_url}
-            />
-            <div className="justify-start text-white text-sm font-normal truncate">
+          <div className="justify-start text-white text-sm font-normal truncate flex-1">
               {currentModel.name}
-            </div>
           </div>
         ) : (
           <div className="justify-start text-white text-sm font-normal">请选择</div>

@@ -129,7 +129,6 @@ export const ModelsManagement = (): JSX.Element => {
       <h2 className="text-2xl font-bold text-gray-800">模型管理</h2>
       
       <div className="flex justify-between items-center">
-        {/* 搜索框 */}
         <div className="relative w-64">
           <SearchIcon className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
           <Input
@@ -140,7 +139,6 @@ export const ModelsManagement = (): JSX.Element => {
           />
         </div>
         
-        {/* 上传按钮 */}
         <div>
           <input
             type="file"
@@ -174,7 +172,6 @@ export const ModelsManagement = (): JSX.Element => {
         </div>
       )}
       
-      {/* 模型表格 */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -217,13 +214,11 @@ export const ModelsManagement = (): JSX.Element => {
                 </td>
                 <td className="px-6 py-4">
                   <div className="text-sm text-gray-500 max-w-xs truncate" title={model.description || ''}>
-                    {model.description || '-'}
-                  </div>
+                    {model.description || '-'}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-500">
-                    {new Date(model.created_at || '').toLocaleString()}
-                  </div>
+                    {new Date(model.created_at || '').toLocaleString()}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button

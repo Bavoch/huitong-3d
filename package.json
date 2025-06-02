@@ -5,11 +5,13 @@
   "name": "huitong-3d",
   "description": "会通3D模型展示和材质定制平台",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port 3000 --host localhost",
     "build": "vite build",
     "upload-models": "node scripts/upload-sample-models.js",
-    "start": "node start-dev.js",
-    "stop": "node stop-dev.js"
+    "start": "npm run stop && npm run dev",
+    "stop": "node stop-dev.js",
+    "preview": "vite preview --port 3000",
+    "status": "lsof -i :3000 || echo '没有进程在3000端口运行'"
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.1.2",
@@ -27,6 +29,7 @@
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.30.1",
     "tailwind-merge": "2.5.4",
+    "terser": "^5.40.0",
     "three": "^0.175.0"
   },
   "devDependencies": {

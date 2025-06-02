@@ -5,6 +5,62 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { type Model } from '../lib/localStorage';
 
+// 检测 WebGL 支持情况和环境
+const checkWebGLSupport = (): { supported: boolean; reason?: string; isPreviewEnv: boolean; } => {
+  try {
+    // 尝试创建 WebGL 上下文
+    const canvas = document.createElement('canvas');
+    const gl = 
+      canvas.getContext('webgl') || 
+      canvas.getContext('experimental-webgl') as WebGLRenderingContext | null;
+    
+    if (!gl) {
+      return { 
+        supported: false, 
+        reason: '您的浏览器不支持 WebGL，请使用现代浏览器如 Chrome 或 Firefox',
+        isPreviewEnv: false
+      };
+    }
+    
+    // 检查 WebGL 版本和扩展
+    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+    const renderer = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : null;
+    
+    // 判断是否在预览环境中
+    const isPreviewEnvironment = 
+      window.location.hostname.includes('localhost') || 
+      window.location.hostname.includes('127.0.0.1') || 
+      window.navigator.userAgent.toLowerCase().includes('windsurf');
+
+    console.log('WebGL 渲染器:', renderer);
+    console.log('预览环境:', isPreviewEnvironment);
+    
+    return { 
+      supported: true,
+      isPreviewEnv: isPreviewEnvironment
+    };
+    
+  } catch (e) {
+    console.error('WebGL 检测错误:', e);
+    return { 
+      supported: false, 
+      reason: '检测 WebGL 时发生错误',
+      isPreviewEnv: false
+    };
+  }
+};
+
+// 环境适配函数，设置兼容不同预览环境的参数
+const setupEnvironmentCompat = (isPreviewEnv: boolean): void => {
+  if (isPreviewEnv) {
+    // 设置预览环境下的特定参数
+    THREE.Object3D.DEFAULT_UP.set(0, 1, 0);
+    
+    // 启用颜色管理以确保所有环境中光照效果一致
+    THREE.ColorManagement.enabled = true;
+  }
+};
+
 // 改进的加载指示器组件，显示进度和阶段
 function LoadingIndicator({ progress = 0, stage = '准备中' }: { progress?: number; stage?: string }) {
   return (
@@ -579,12 +635,32 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
   const [modelViewKey, setModelViewKey] = useState<string>('');
   const [modelValid, setModelValid] = useState<boolean>(true);
   const [modelPath, setModelPath] = useState<string>('');
+  const [webGLSupport, setWebGLSupport] = useState<{supported: boolean; reason?: string}>({supported: true});
+  const [isPreviewEnv, setIsPreviewEnv] = useState<boolean>(false);
   const previousModelIdRef = useRef<string>('');
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const defaultCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<any>(null);
+  
+  // 检测 WebGL 支持和环境
+  useEffect(() => {
+    // 检测 WebGL 支持和环境状态
+    const result = checkWebGLSupport();
+    setWebGLSupport({ supported: result.supported, reason: result.reason });
+    setIsPreviewEnv(result.isPreviewEnv);
+    
+    console.log(`当前环境: ${result.isPreviewEnv ? '预览' : '常规浏览器'}, WebGL支持: ${result.supported}`);
+    
+    // 设置环境兼容参数
+    setupEnvironmentCompat(result.isPreviewEnv);
+
+    // 清理函数
+    return () => {
+      // 必要的清理工作
+    };
+  }, []);
 
   // 验证和处理模型路径
   useEffect(() => {
@@ -791,28 +867,45 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
     if (window) {
       (window as any).captureModelScreenshot = captureScreenshot;
     }
-
+    
+    // 清理函数
     return () => {
-      // 清理
       if (window && (window as any).captureModelScreenshot) {
         delete (window as any).captureModelScreenshot;
       }
     };
   }, [captureScreenshot]);
 
+  // 处理 WebGL 不支持的情况
+  if (!webGLSupport.supported) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-900 text-white p-4 rounded-md">
+        <div className="text-center p-6 bg-black/70 rounded-lg max-w-md">
+          <div className="text-red-500 text-2xl mb-2">⚠️ WebGL 不可用</div>
+          <p className="mb-4">{webGLSupport.reason || '您的浏览器不支持 WebGL，请使用现代浏览器如 Chrome 或 Firefox'}</p>
+          <p>推荐使用 Chrome 或 Firefox 的最新版本访问此页面。</p>
+        </div>
+      </div>
+    );
+  }
+  
   return (
-    <div className="w-full h-full relative">
-
-
+    <div className="w-full h-full">
+      {/* 使用三维库绘制画布 */}
       <Canvas
-        camera={{ position: [0, 0, 5], fov: 50 }}
-        style={{ background: 'transparent' }}
+        key={modelViewKey || 'default-key'}
+        className="w-full h-full bg-gray-900 rounded-md"
         gl={{
           antialias: true,
           preserveDrawingBuffer: true, // 允许截图
-          alpha: true // 透明背景
+          alpha: true, // 透明背景
+          // 针对不同环境的渲染优化
+          powerPreference: "high-performance",
+          precision: isPreviewEnv ? "highp" : "mediump"
         }}
-        dpr={[1, 2]}
+        shadows
+        camera={{ position: [0, 0, 5], fov: 50 }}
+        style={{ background: 'transparent' }}
         onCreated={({ gl, scene, camera }) => {
           // 保存渲染器、场景和相机引用
           rendererRef.current = gl;

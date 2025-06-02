@@ -193,7 +193,7 @@ export const MaterialThumbnail: React.FC<MaterialThumbnailProps> = ({
       <Canvas
         gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }} // 确保可以截图
         dpr={[1, 2]}
-        camera={{ position: [0, 0, 2.5], fov: 50 }}
+        camera={{ position: [0, 0.1, 2.5], fov: 50 }}
         style={{ background: 'transparent' }}
       >
         <MaterialScene 

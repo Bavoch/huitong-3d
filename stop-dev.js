@@ -58,9 +58,15 @@ const killProcessOnPort = (port) => {
         }
       } else {
         // Unix输出格式: node      12345 user   17u  IPv4 1234567      0t0  TCP *:3000 (LISTEN)
-        const match = stdout.match(/\s*\S+\s+(\d+)/);
-        if (match && match[1]) {
-          pid = match[1];
+        const lines = stdout.split('\n');
+        for (const line of lines) {
+          if (line.includes('LISTEN')) {
+            const match = line.match(/\s*\S+\s+(\d+)/);
+            if (match && match[1]) {
+              pid = match[1];
+              break;
+            }
+          }
         }
       }
       
@@ -92,20 +98,32 @@ const killProcessOnPort = (port) => {
 // 停止开发服务器
 const stopDevServer = async () => {
   const port = checkLockFile();
-  
+
   if (!port) {
-    console.log('没有找到开发服务器锁文件，服务器可能未运行');
-    return;
+    console.log('没有找到开发服务器锁文件，尝试停止所有可能的端口...');
   }
-  
-  console.log(`尝试停止在端口 ${port} 上运行的开发服务器...`);
-  
-  try {
-    await killProcessOnPort(port);
-    removeLockFile();
+
+  // 停止所有可能的端口上的Vite进程
+  const portsToCheck = port ? [port] : [3000, 3001, 3002, 3003];
+
+  console.log(`尝试停止端口 ${portsToCheck.join(', ')} 上的开发服务器...`);
+
+  let stoppedAny = false;
+  for (const portToCheck of portsToCheck) {
+    try {
+      await killProcessOnPort(portToCheck);
+      stoppedAny = true;
+    } catch (error) {
+      // 忽略单个端口的错误，继续检查其他端口
+    }
+  }
+
+  removeLockFile();
+
+  if (stoppedAny) {
     console.log('开发服务器已停止');
-  } catch (error) {
-    console.error('停止开发服务器时出错:', error);
+  } else {
+    console.log('没有找到运行中的开发服务器');
   }
 };
 

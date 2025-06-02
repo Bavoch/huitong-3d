@@ -10,29 +10,30 @@ dns.setDefaultResultOrder('verbatim');
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: "/",
+  // 使用相对路径，确保在不同预览环境中资源路径正确
+  base: './',
   css: {
     postcss: {
       plugins: [tailwind()],
     },
   },
   server: {
-    host: "0.0.0.0",
-    port: 3000, // 使用3000端口
-    strictPort: false, // 如果端口被占用，尝试下一个可用端口
+    host: "localhost",
+    port: 3000, // 固定使用3000端口
+    strictPort: true, // 如果端口被占用，报错而不是尝试其他端口
     hmr: {
-      // 启用热模块替换
       overlay: true, // 在页面上显示错误
+      port: 3000,
+      host: "localhost",
     },
     watch: {
-      // 监视文件变化
-      usePolling: false, // 使用文件系统事件而不是轮询
-      ignored: ['**/node_modules/**', '**/dist/**'], // 忽略这些目录的变化
+      usePolling: false, // 关闭轮询，提高性能
+      ignored: ['**/node_modules/**', '**/dist/**'],
     },
     open: false, // 不自动打开浏览器
-    // 确保 public 目录被正确设置为静态资源目录
     fs: {
       strict: false,
+      allow: ['.'],
     },
   },
   // 配置静态资源
@@ -46,5 +47,15 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
       },
     },
+    // 改进兼容性设置
+    target: 'es2015', // 更好的浏览器兼容性
+    minify: 'terser',
+  },
+  // 优化预览环境
+  preview: {
+    port: 3000,
+    strictPort: false,
+    host: true,
+    open: false,
   },
 });

@@ -7,8 +7,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        "14": "var(--14-font-family)",
         sans: [
+          "var(--font-family)",
           "ui-sans-serif",
           "system-ui",
           "sans-serif",
@@ -17,6 +17,28 @@ export default {
           '"Segoe UI Symbol"',
           '"Noto Color Emoji"',
         ],
+      },
+      fontSize: {
+        xs: "var(--font-size-xs)",
+        sm: "var(--font-size-sm)",
+        base: "var(--font-size-base)",
+        lg: "var(--font-size-lg)",
+        xl: "var(--font-size-xl)",
+      },
+      fontWeight: {
+        normal: "var(--font-weight-normal)",
+        medium: "var(--font-weight-medium)",
+        semibold: "var(--font-weight-semibold)",
+        bold: "var(--font-weight-bold)",
+      },
+      spacing: {
+        xs: "var(--spacing-xs)",
+        sm: "var(--spacing-sm)",
+        md: "var(--spacing-md)",
+        lg: "var(--spacing-lg)",
+        xl: "var(--spacing-xl)",
+        "2xl": "var(--spacing-2xl)",
+        "3xl": "var(--spacing-3xl)",
       },
       colors: {
         border: "hsl(var(--border))",
@@ -52,31 +74,36 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        "背景": {
-          "容器背景1": "rgba(255, 255, 255, 0.05)",
+        // 应用特定颜色
+        "app-bg": "rgb(var(--app-bg))",
+        "container": {
+          DEFAULT: "rgb(var(--container-bg))",
+          hover: "rgb(var(--container-bg-hover))",
+          active: "rgb(var(--container-bg-active))",
         },
-        "内容": {
-          "常规": "rgba(255, 255, 255, 1)",
-          "弱化": {
-            DEFAULT: "rgba(255, 255, 255, 0.7)",
-            "40": "rgba(255, 255, 255, 0.4)"
-          },
-          "强调": {
-            "90": "rgba(255, 255, 255, 0.9)"
-          }
+        "text": {
+          primary: "rgb(var(--text-primary))",
+          secondary: "rgb(var(--text-secondary))",
+          tertiary: "rgb(var(--text-tertiary))",
+          quaternary: "rgb(var(--text-quaternary))",
         },
-        "输入框": {
-          "20": "rgba(255, 255, 255, 0.05)"
-        },
-        "边框": {
-          "10": "rgba(255, 255, 255, 0.1)"
-        },
-        "品牌色": "#2268eb",
+        "input-bg": "rgb(var(--input-bg))",
+        "border-subtle": "rgb(var(--border-subtle))",
+        "border-emphasis": "rgb(var(--border-emphasis))",
+        "scrollbar-thumb": "rgb(var(--scrollbar-thumb))",
+        "tooltip-bg": "rgb(var(--tooltip-bg))",
+        "brand": "hsl(var(--brand))",
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        xs: "var(--radius-xs)",
+        sm: "var(--radius-sm)",
+        md: "var(--radius-md)",
+        lg: "var(--radius-lg)",
+        xl: "var(--radius-xl)",
+        "2xl": "var(--radius-2xl)",
+        full: "var(--radius-full)",
+        // 保持原有的基于 --radius 的配置
+        DEFAULT: "var(--radius)",
       },
       keyframes: {
         "accordion-down": {

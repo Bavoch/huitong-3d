@@ -25,7 +25,7 @@ export const AdminLayout = (): JSX.Element => {
       {/* 顶部导航 */}
       <header className="bg-white border-b border-gray-200 py-3 shadow-sm">
         <div className="container mx-auto px-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-800">会通三维 - 后台管理系统</h1>
+          <h1 className="text-xl font-bold text-gray-800">会通智能色彩云库</h1>
           <Button 
             variant="outline"
             onClick={handleLogout}

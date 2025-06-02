@@ -41,7 +41,7 @@ export const AdminDashboard = (): JSX.Element => {
         <ul className="space-y-2 text-gray-600">
           <li className="flex justify-between">
             <span>版本</span>
-            <span>会通三维管理系统 v1.0.0</span>
+            <span>会通智能色彩云库 v1.0.0</span>
           </li>
           <li className="flex justify-between">
             <span>数据存储</span>

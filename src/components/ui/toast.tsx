@@ -105,7 +105,7 @@ const ToastItem: React.FC<{ toast: Toast; onClose: () => void }> = ({
 
   return (
     <div
-      className={`min-w-[300px] max-w-md px-4 py-3 rounded-lg shadow-md border ${getBgColor()} text-gray-700 dark:text-gray-200 flex items-center gap-3 animate-slideIn`}
+      className={`min-w-[300px] max-w-md px-lg py-md rounded-lg shadow-md border ${getBgColor()} text-text-primary flex items-center gap-md animate-slideIn`}
       style={{
         animation: 'slideIn 0.3s ease-out forwards, fadeOut 0.3s ease-out forwards',
         animationDelay: `0s, ${duration - 300}ms`,
@@ -115,7 +115,7 @@ const ToastItem: React.FC<{ toast: Toast; onClose: () => void }> = ({
       <div className="flex-1">{message}</div>
       <button
         onClick={onClose}
-        className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+        className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-container-hover transition-colors"
       >
         <XIcon className="w-4 h-4" />
       </button>

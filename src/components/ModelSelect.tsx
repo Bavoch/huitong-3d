@@ -44,18 +44,18 @@ const ModelSelect: React.FC<ModelSelectProps> = ({
       {/* 下拉框触发器 */}
       <div
         ref={triggerRef}
-        className={`w-full h-8 px-2 py-1.5 bg-输入框/20 rounded-lg outline outline-1 outline-offset-[-1px] ${isModalOpen ? 'outline-品牌色' : 'outline-边框/10'} inline-flex justify-between items-center overflow-hidden cursor-pointer`}
+        className={`w-full h-8 px-sm py-1.5 bg-input-bg rounded-lg outline outline-1 outline-offset-[-1px] ${isModalOpen ? 'outline-border-emphasis' : 'outline-border-subtle'} inline-flex justify-between items-center overflow-hidden cursor-pointer`}
         onClick={() => setIsModalOpen(true)}
       >
         {currentModel ? (
-          <div className="justify-start text-white text-sm font-normal truncate flex-1">
+          <div className="justify-start text-text-primary text-base font-normal truncate flex-1">
               {currentModel.name}
           </div>
         ) : (
-          <div className="justify-start text-white text-sm font-normal">请选择</div>
+          <div className="justify-start text-text-primary text-base font-normal">请选择</div>
         )}
         <div className="ChevronDown w-4 h-4 relative overflow-hidden">
-          <ChevronDownIcon className="w-4 h-4 text-white" />
+          <ChevronDownIcon className="w-4 h-4 text-text-primary" />
         </div>
       </div>
 

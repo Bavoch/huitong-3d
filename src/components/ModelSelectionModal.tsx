@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Model } from '../lib/supabase';
 import { SearchIcon, XIcon } from 'lucide-react';
 import ModelThumbnail from './ModelThumbnail';
+import SearchInput from './SearchInput';
 
 interface ModelSelectionModalProps {
   isOpen: boolean;
@@ -135,7 +136,7 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
   return (
     <div
       ref={popoverRef}
-      className={`fixed w-[400px] max-h-[500px] bg-[#262626] border border-[#ffffff1a] rounded-lg shadow-lg z-50 transition-opacity duration-200 ${
+      className={`fixed w-[222px] max-h-[500px] bg-[#1F1F1F] border-[rgba(255,255,255,0.02)] shadow-[0px_2px_15px_0px_rgba(0,0,0,0.3),_inset_0px_0px_6px_0px_rgba(0,0,0,0.15),_inset_0px_2px_6px_0px_rgba(255,255,255,0.03)] rounded-[16px] z-50 transition-opacity duration-200 ${
         isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
       }`}
       style={{
@@ -143,48 +144,26 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
         left: `${position.left}px`,
       }}
     >
-      {/* 头部 */}
-      <div className="flex items-center justify-between p-4 border-b border-[#ffffff1a]">
-        <h2 className="text-white text-lg font-semibold">选择模型</h2>
-        <button
-          onClick={onClose}
-          className="p-2 rounded-md hover:bg-[#ffffff1a] text-[#ffffff80] hover:text-white transition-colors"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 6L6 18"></path>
-            <path d="M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
 
       {/* 搜索框 */}
-      <div className="p-4 border-b border-[#ffffff1a]">
-        <div className="relative">
-          <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#ffffff66]" />
-          <input
-            type="text"
-            placeholder="搜索"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-10 pl-10 pr-4 bg-[#1a1a1a] border border-[#ffffff1a] rounded-lg text-white placeholder-[#ffffff66] focus:outline-none focus:border-[#2268eb] transition-colors"
-          />
-        </div>
+      <div className="p-lg">
+        <SearchInput value={searchQuery} onChange={setSearchQuery} />
       </div>
 
       {/* 模型网格 */}
-      <div className="flex-1 overflow-y-auto p-4 max-h-[350px]">
+      <div className="flex-1 overflow-y-auto p-lg max-h-[350px]">
         {filteredModels.length > 0 ? (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-lg">
             {filteredModels.map((model) => (
               <div
                 key={model.id}
-                className={`relative aspect-square bg-[#1a1a1a] rounded-lg cursor-pointer transition-all hover:bg-[#2a2a2a] group ${
-                  model.id === selectedModel ? 'ring-2 ring-[#2268eb] bg-[#2268eb1a]' : ''
+                className={`relative aspect-square bg-[rgba(255,255,255,0.05)] rounded-[8px] cursor-pointer transition-all hover:bg-container-hover group ${
+                  model.id === selectedModel ? 'ring-2 ring-[#2269EC] bg-container-active' : ''
                 }`}
                 onClick={() => handleSelectModel(model.id)}
               >
                 {/* 模型缩略图 */}
-                <div className="w-full h-full p-3 flex items-center justify-center">
+                <div className="w-full h-full p-md flex items-center justify-center">
                   <ModelThumbnail
                     id={model.id}
                     thumbnailUrl={model.thumbnail_url}
@@ -195,7 +174,7 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
                 {/* 删除按钮 */}
                 {showDeleteButton && onDelete && (
                   <button
-                    className="absolute top-2 right-2 p-1 rounded-md bg-[#ff4444] hover:bg-[#ff6666] text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-sm right-sm p-1 rounded-md bg-destructive hover:bg-destructive/80 text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={(e) => handleDeleteModel(e, model.id)}
                     title="删除模型"
                   >
@@ -210,8 +189,8 @@ const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
             ))}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-32 text-[#ffffff66]">
-            <SearchIcon className="w-8 h-8 mb-2" />
+          <div className="flex flex-col items-center justify-center h-32 text-text-tertiary">
+            <SearchIcon className="w-8 h-8 mb-sm" />
             <p className="text-sm font-medium">没有找到模型</p>
             <p className="text-xs">尝试调整搜索条件</p>
           </div>

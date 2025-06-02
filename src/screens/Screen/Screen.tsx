@@ -31,6 +31,7 @@ import { preloadImages } from "../../utils/imageCache";
 import { ensureModelsBucketExists } from "../../utils/storageBuckets";
 import { MaterialThumbnail } from '../../components/MaterialThumbnail';
 import { toast } from '../../components/ui/toast';
+import { Tooltip } from '../../components/ui/tooltip';
 import { getMaterials, Material } from '../../lib/materialStorage';
 import { base64ToBlob, extractMimeType } from '../../utils/blobUtils';
 
@@ -606,9 +607,9 @@ export const Screen = (): JSX.Element => {
   }, [sidebarWidth]);
 
   return (
-    <main className="flex flex-col h-screen items-start gap-5 p-5 relative bg-[#191919] overflow-hidden">
+    <main className="flex flex-col h-screen items-start gap-xl p-xl relative bg-app-bg overflow-hidden">
       {/* Header */}
-      <header className="flex items-center justify-between pl-2 pr-0 py-0 relative self-stretch w-full flex-shrink-0">
+      <header className="flex items-center justify-between pl-sm pr-0 py-0 relative self-stretch w-full flex-shrink-0">
         <img
           className="relative w-[78px] h-6 object-contain cursor-pointer"
           alt="Logo"
@@ -618,10 +619,10 @@ export const Screen = (): JSX.Element => {
           style={{ cursor: 'pointer' }}
         />
 
-        <div className="inline-flex items-center justify-end gap-2 relative">
+        <div className="inline-flex items-center justify-end gap-sm relative">
               <Button
             variant="ghost"
-            className="h-8 inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
+            className="h-8 inline-flex items-center justify-center gap-1 px-md py-1.5 bg-container rounded-lg hover:bg-container-hover"
             onClick={() => {
               // 使用模型的截图功能
               const dataUrl = (window as any).captureModelScreenshot ? (window as any).captureModelScreenshot() : null;
@@ -664,15 +665,15 @@ export const Screen = (): JSX.Element => {
               }
             }}
           >
-            <CopyIcon className="w-4 h-4 text-[#ffffffb2]" />
-            <span className="text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal">
+            <CopyIcon className="w-4 h-4 text-text-secondary" />
+            <span className="text-text-secondary w-fit mt-[-1.00px] text-base font-medium leading-normal">
               复制图片
             </span>
           </Button>
 
           <Button
             variant="default"
-            className="h-8 inline-flex items-center justify-center gap-1 px-3 py-1.5 btn-primary rounded-lg"
+            className="h-8 inline-flex items-center justify-center gap-1 px-md py-1.5 btn-primary rounded-lg"
             onClick={() => {
               // 使用模型的截图功能
               const dataUrl = (window as any).captureModelScreenshot ? (window as any).captureModelScreenshot() : null;
@@ -690,7 +691,7 @@ export const Screen = (): JSX.Element => {
             }}
           >
             <DownloadIcon className="w-4 h-4" />
-            <span className="w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal">
+            <span className="w-fit mt-[-1.00px] text-base font-medium leading-normal">
               保存图片
             </span>
           </Button>
@@ -700,7 +701,7 @@ export const Screen = (): JSX.Element => {
       {/* Main content area - 使用flex-1确保填充剩余空间 */}
       <div ref={mainContentRef} className="flex items-stretch relative w-full flex-1 overflow-hidden">
         {/* 3D Preview Area */}
-        <Card className="relative flex-1 bg-[#ffffff0d] rounded-2xl overflow-hidden border-0 h-full">
+        <Card className="relative flex-1 bg-container rounded-2xl overflow-hidden border-0 h-full">
           <CardContent className="p-0 h-full relative">
             {effectiveModel ? (
               <ModelViewer
@@ -710,26 +711,31 @@ export const Screen = (): JSX.Element => {
                 customMetallic={customMetallic}
               />
             ) : (
-              <div className="flex items-center justify-center h-full text-white opacity-50">
+              <div className="flex items-center justify-center h-full text-text-primary opacity-50">
                 请选择一个模型
               </div>
             )}
 
-            <Button
-              variant="ghost"
-              className="inline-flex items-center gap-1.5 px-2 py-1 absolute bottom-4 right-4 bg-[#ffffff0d] rounded-[99px] hover:bg-[#ffffff1a] z-10"
-            >
-              <HelpCircleIcon className="w-4 h-4" />
-              <span className="text-[#ffffff66] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal">
-                操作说明
-              </span>
-            </Button>
+            <Tooltip content="在3D模型查看器中：
+1. 鼠标左键拖动：旋转视角
+2. 鼠标滚轮：缩放模型
+3. 鼠标右键拖动：平移视角" position="top">
+              <Button
+                variant="ghost"
+                className="inline-flex items-center gap-1.5 px-sm py-1 absolute bottom-4 right-4 bg-container rounded-full hover:bg-container-hover z-10"
+              >
+                <HelpCircleIcon className="w-4 h-4 text-text-tertiary" />
+                <span className="text-text-tertiary w-fit mt-[-1.00px] text-base font-medium leading-normal">
+                  操作说明
+                </span>
+              </Button>
+            </Tooltip>
           </CardContent>
         </Card>
 
         {/* 可拖拽分隔线区域 - 只在悬停时显示 */}
         <div
-          className="relative w-5 mx-0 self-stretch cursor-col-resize group bg-transparent hover:bg-[#ffffff0d]"
+          className="relative w-5 mx-0 self-stretch cursor-col-resize group bg-transparent hover:bg-container"
           onMouseDown={handleDividerMouseDown}
           title="拖拽调整宽度"
           id="divider-handle"
@@ -737,21 +743,21 @@ export const Screen = (): JSX.Element => {
           {/* 实际的分隔线 - 只在悬停或拖拽时显示 */}
           <div
             className={`absolute left-1/2 transform -translate-x-1/2 w-[2px] h-full transition-all duration-200 ${
-              isDragging ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'bg-transparent group-hover:bg-blue-500'
+              isDragging ? 'bg-brand shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'bg-transparent group-hover:bg-brand'
             }`}
           ></div>
         </div>
 
         {/* Sidebar */}
         <Card
-          className="flex flex-col items-start gap-4 p-3 relative bg-[#ffffff0d] rounded-2xl border-0 h-full overflow-hidden"
+          className="flex flex-col items-start gap-lg p-md relative bg-container rounded-2xl border-0 h-full overflow-hidden"
           style={{ width: `${sidebarWidth}px` }}>
-          <CardContent className="p-0 space-y-4 w-full h-full overflow-y-auto scrollbar-thin scrollbar-thumb-[#3a3a3a] scrollbar-track-transparent max-w-full flex flex-col">
+          <CardContent className="p-0 space-y-lg w-full h-full overflow-y-auto scrollbar-thin scrollbar-thumb-scrollbar-thumb scrollbar-track-transparent max-w-full flex flex-col">
             {/* Model Selection Section */}
-            <div className="flex flex-col items-start gap-2 relative self-stretch w-full">
+            <div className="flex flex-col items-start gap-sm relative self-stretch w-full">
               <div className="inline-flex items-center gap-1 relative">
-                <BoxIcon className="w-4 h-4 text-[#ffffffb2]" />
-                <span className="text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal">
+                <BoxIcon className="w-4 h-4 text-text-secondary" />
+                <span className="text-text-secondary w-fit mt-[-1.00px] text-base font-medium leading-normal">
                   模型
                 </span>
               </div>
@@ -759,9 +765,9 @@ export const Screen = (): JSX.Element => {
               {/* 模型选择下拉框 */}
               <div className="mb-2 w-full">
                 {loading ? (
-                  <div className="p-4 text-center text-[#ffffff80] text-[14px] w-full">
-                    <div className="flex justify-center items-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                  <div className="p-lg text-center text-text-secondary text-base w-full">
+                    <div className="flex justify-center items-center space-x-sm">
+                      <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin flex-shrink-0" />
                       <span>加载模型中...</span>
                     </div>
                   </div>
@@ -798,37 +804,37 @@ export const Screen = (): JSX.Element => {
                 className="hidden"
                 onChange={handleFileUpload}
               />
-              <div className="flex gap-2 w-full">
+              <div className="flex gap-sm w-full">
                 <Button
                   variant="ghost"
-                  className="h-8 flex-1 min-w-0 flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
+                  className="h-8 flex-1 min-w-0 flex items-center justify-center gap-1 px-sm py-1.5 bg-container rounded-lg hover:bg-container-hover"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <UploadIcon className="w-4 h-4 text-[#ffffffb2] flex-shrink-0" />
-                  <span className="text-[#ffffffb2] mt-[-1.00px] text-[14px] font-[500] leading-normal truncate">
+                  <UploadIcon className="w-4 h-4 text-text-secondary flex-shrink-0" />
+                  <span className="text-text-secondary mt-[-1.00px] text-base font-medium leading-normal truncate">
                     上传模型
                   </span>
                 </Button>
 
               </div>
               {uploadedModels.length > 0 && (
-                <div className="flex gap-2 mt-2 w-full">
+                <div className="flex gap-sm mt-sm w-full">
                   <Button
                     variant="ghost"
-                    className="h-8 flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
+                    className="h-8 flex-1 flex items-center justify-center gap-1 px-sm py-1.5 bg-container rounded-lg hover:bg-container-hover"
                     onClick={() => setShowUploadedModels(true)}
                   >
-                    <span className={`text-[#ffffffb2] mt-[-1.00px] text-[14px] font-[500] leading-normal truncate ${showUploadedModels ? 'text-[#2268eb]' : ''}`}>
+                    <span className={`text-text-secondary mt-[-1.00px] text-base font-medium leading-normal truncate ${showUploadedModels ? 'text-brand' : ''}`}>
                       上传模型
                     </span>
                   </Button>
 
                   <Button
                     variant="ghost"
-                    className="h-8 flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33]"
+                    className="h-8 flex-1 flex items-center justify-center gap-1 px-sm py-1.5 bg-container rounded-lg hover:bg-container-hover"
                     onClick={() => setShowUploadedModels(false)}
                   >
-                    <span className={`text-[#ffffffb2] mt-[-1.00px] text-[14px] font-[500] leading-normal truncate ${!showUploadedModels ? 'text-[#2268eb]' : ''}`}>
+                    <span className={`text-text-secondary mt-[-1.00px] text-base font-medium leading-normal truncate ${!showUploadedModels ? 'text-brand' : ''}`}>
                       内置模型
                     </span>
                   </Button>
@@ -838,10 +844,10 @@ export const Screen = (): JSX.Element => {
               {uploadedModels.length > 0 && (
                 <Button
                   variant="ghost"
-                  className="h-8 w-full flex items-center justify-center gap-1 px-2 py-1.5 bg-[#ffffff1f] rounded-lg hover:bg-[#ffffff33] mt-2"
+                  className="h-8 w-full flex items-center justify-center gap-1 px-sm py-1.5 bg-container rounded-lg hover:bg-container-hover mt-sm"
                   onClick={clearUploadedModels}
                 >
-                  <span className="text-[#ffffffb2] mt-[-1.00px] text-[14px] font-[500] leading-normal truncate">
+                  <span className="text-text-secondary mt-[-1.00px] text-base font-medium leading-normal truncate">
                     清除所有上传模型
                   </span>
                 </Button>
@@ -849,20 +855,20 @@ export const Screen = (): JSX.Element => {
             </div>
 
             {/* Material Settings Section */}
-            <div className="flex flex-col items-start gap-2 relative flex-1 self-stretch w-full">
+            <div className="flex flex-col items-start gap-sm relative flex-1 self-stretch w-full">
               <div className="inline-flex items-center gap-1 relative">
-                <ShirtIcon className="w-4 h-4 text-[#ffffffb2]" />
-                <span className="text-[#ffffffb2] w-fit mt-[-1.00px] text-[14px] font-[500] leading-normal">
+                <ShirtIcon className="w-4 h-4 text-text-secondary" />
+                <span className="text-text-secondary w-fit mt-[-1.00px] text-base font-medium leading-normal">
                   材质设置
                 </span>
               </div>
 
               {/* Applied Materials - 当前模型上的材质 */}
-              <div className="flex items-start gap-2 flex-wrap relative self-stretch w-full">
+              <div className="flex items-start gap-sm flex-wrap relative self-stretch w-full">
                 {/* 只显示一个材质球 */}
                 {materials.length > 0 && (
                   <div
-                    className="relative w-10 h-10 bg-[#ffffff0d] rounded-lg cursor-pointer transition-all hover:bg-[#ffffff1a] border border-solid border-[#2268eb]"
+                    className="relative w-10 h-10 bg-container rounded-lg cursor-pointer transition-all hover:bg-container-hover border border-solid border-border-emphasis"
                     onClick={() => {
                       // 已经选中当前材质
                       setSelectedModelMaterialIndex(0);
@@ -891,38 +897,38 @@ export const Screen = (): JSX.Element => {
 
               {/* Material Type Tabs */}
               <Tabs defaultValue="standard" className="w-full flex-1 flex flex-col">
-                <TabsList className="h-9 p-1 w-full bg-[#ffffff0d] rounded-lg grid grid-cols-2">
+                <TabsList className="h-9 p-1 w-full bg-container rounded-lg grid grid-cols-2">
                   <TabsTrigger
                     value="standard"
-                    className="h-7 px-0 py-1.5 data-[state=active]:bg-[#ffffff1f] data-[state=active]:text-[#ffffffe6] data-[state=inactive]:text-[#ffffffb2] rounded-md text-[14px] font-[500] leading-normal"
+                    className="h-7 px-0 py-1.5 data-[state=active]:bg-container-hover data-[state=active]:text-text-primary data-[state=inactive]:text-text-secondary rounded-md text-base font-medium leading-normal"
                   >
                     会通材料
                   </TabsTrigger>
                   <TabsTrigger
                     value="custom"
-                    className="h-7 px-0 py-1.5 data-[state=active]:bg-[#ffffff1f] data-[state=active]:text-[#ffffffe6] data-[state=inactive]:text-[#ffffffb2] rounded-md text-[14px] font-[500] leading-normal"
+                    className="h-7 px-0 py-1.5 data-[state=active]:bg-container-hover data-[state=active]:text-text-primary data-[state=inactive]:text-text-secondary rounded-md text-base font-medium leading-normal"
                   >
                     自定义
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="standard" className="mt-3 p-0 flex-1 flex flex-col">
-                  <div className="flex flex-col items-start gap-3 relative flex-1 self-stretch w-full rounded-2xl">
+                <TabsContent value="standard" className="mt-md p-0 flex-1 flex flex-col">
+                  <div className="flex flex-col items-start gap-md relative flex-1 self-stretch w-full rounded-2xl">
                     {/* Search Input */}
-                    <div className="flex items-center gap-1 px-2 py-1.5 relative self-stretch w-full bg-[#00000026] rounded-lg overflow-hidden">
-                      <SearchIcon className="w-4 h-4 text-[#ffffff66]" />
+                    <div className="flex items-center gap-1 px-sm py-1.5 relative self-stretch w-full bg-input-bg rounded-lg overflow-hidden">
+                      <SearchIcon className="w-4 h-4 text-text-tertiary" />
                       <Input
-                        className="border-0 bg-transparent text-[#ffffff66] text-[14px] font-[500] leading-normal p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0"
+                        className="border-0 bg-transparent text-text-tertiary text-base font-medium leading-normal p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0"
                         placeholder="搜索"
                       />
                     </div>
 
                     {/* Material Grid */}
-                    <div className="flex flex-wrap w-full items-start content-start gap-[8px] relative flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-[#3a3a3a] scrollbar-track-transparent">
+                    <div className="flex flex-wrap w-full items-start content-start gap-sm relative flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-scrollbar-thumb scrollbar-track-transparent">
                       {materials.map((material) => (
                         <div
                           key={material.id}
-                          className={`flex w-[calc(33.33%-6px)] h-[60px] items-center gap-1 p-2.5 relative bg-[#ffffff0d] rounded-lg overflow-hidden ${material.id === selectedMaterialId ? "border border-solid border-[#2268eb]" : ""}`}
+                          className={`flex w-[calc(33.33%-6px)] h-[60px] items-center gap-1 p-2.5 relative bg-container rounded-lg overflow-hidden ${material.id === selectedMaterialId ? "border border-solid border-border-emphasis" : ""}`}
                           onClick={() => {
                             // 选中这个材质
                             setSelectedMaterialId(material.id);
@@ -955,30 +961,30 @@ export const Screen = (): JSX.Element => {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="custom" className="mt-3 space-y-4">
+                <TabsContent value="custom" className="mt-md space-y-lg">
                   {/* Color Picker */}
-                  <div className="space-y-2 w-full">
-                    <label className="text-[#ffffffb2] text-[14px] font-[500] leading-normal">颜色</label>
-                    <div className="flex gap-2 w-full">
+                  <div className="space-y-sm w-full">
+                    <label className="text-text-secondary text-base font-medium leading-normal">颜色</label>
+                    <div className="flex gap-sm w-full">
                       <input
                         type="color"
                         value={customColor}
                         onChange={(e) => setCustomColor(e.target.value)}
-                        className="w-8 h-8 bg-[#00000026] rounded-lg border-0 cursor-pointer [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none flex-shrink-0"
+                        className="w-8 h-8 bg-input-bg rounded-lg border-0 cursor-pointer [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none flex-shrink-0"
                       />
                       <Input
                         value={customColor.toUpperCase()}
                         onChange={(e) => setCustomColor(e.target.value)}
-                        className="flex-1 min-w-0 h-8 px-2 py-1.5 bg-[#00000026] text-[#ffffffe6] text-[14px] font-[500] leading-normal border-0 rounded-lg focus-visible:ring-0 focus-visible:ring-offset-0 uppercase"
+                        className="flex-1 min-w-0 h-8 px-sm py-1.5 bg-input-bg text-text-primary text-base font-medium leading-normal border-0 rounded-lg focus-visible:ring-0 focus-visible:ring-offset-0 uppercase"
                       />
                     </div>
                   </div>
 
                   {/* Roughness Slider */}
-                  <div className="space-y-2 w-full">
+                  <div className="space-y-sm w-full">
                     <div className="flex justify-between w-full">
-                      <label className="text-[#ffffffb2] text-[14px] font-[500] leading-normal">粗糙度</label>
-                      <span className="text-[#ffffff66] text-[14px] font-[500] leading-normal">{customRoughness}</span>
+                      <label className="text-text-secondary text-base font-medium leading-normal">粗糙度</label>
+                      <span className="text-text-tertiary text-base font-medium leading-normal">{customRoughness}</span>
                     </div>
                     <input
                       type="range"
@@ -987,15 +993,15 @@ export const Screen = (): JSX.Element => {
                       step="0.01"
                       value={customRoughness}
                       onChange={(e) => setCustomRoughness(parseFloat(e.target.value))}
-                      className="w-full h-1 bg-[#ffffff1a] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
+                      className="w-full h-1 bg-container-hover rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-text-primary"
                     />
                   </div>
 
                   {/* Metallic Slider */}
-                  <div className="space-y-2 w-full">
+                  <div className="space-y-sm w-full">
                     <div className="flex justify-between w-full">
-                      <label className="text-[#ffffffb2] text-[14px] font-[500] leading-normal">金属度</label>
-                      <span className="text-[#ffffff66] text-[14px] font-[500] leading-normal">{customMetallic}</span>
+                      <label className="text-text-secondary text-base font-medium leading-normal">金属度</label>
+                      <span className="text-text-tertiary text-base font-medium leading-normal">{customMetallic}</span>
                     </div>
                     <input
                       type="range"
@@ -1004,7 +1010,7 @@ export const Screen = (): JSX.Element => {
                       step="0.01"
                       value={customMetallic}
                       onChange={(e) => setCustomMetallic(parseFloat(e.target.value))}
-                      className="w-full h-1 bg-[#ffffff1a] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
+                      className="w-full h-1 bg-container-hover rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-text-primary"
                     />
                   </div>
                 </TabsContent>

@@ -104,7 +104,7 @@ const stopDevServer = async () => {
   }
 
   // 停止所有可能的端口上的Vite进程
-  const portsToCheck = port ? [port] : [3000, 3001, 3002, 3003];
+  const portsToCheck = port ? [port] : [3000];
 
   console.log(`尝试停止端口 ${portsToCheck.join(', ')} 上的开发服务器...`);
 

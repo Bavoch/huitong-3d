@@ -947,12 +947,17 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 inline-flex justify-start items-center gap-3">
         {/* 默认视图按钮 */}
         <div
-          className="pl-2 pr-1 py-1 bg-背景-容器背景1/5 rounded-[99px] flex justify-start items-center gap-1.5 cursor-pointer"
+          className="pl-2 pr-1 py-1 bg-container rounded-[99px] flex justify-start items-center gap-1.5 cursor-pointer hover:bg-container-hover"
           onClick={resetToDefaultView}
         >
-          <div className="justify-start text-内容-常规/70 text-sm font-medium font-['PingFang_SC']">默认视图</div>
-          <div className="w-4 h-4 relative overflow-hidden">
-            <div className="w-3 h-3 left-[2px] top-[2px] absolute outline outline-1 outline-offset-[-0.50px] outline-内容-常规/70" />
+          <div className="justify-start text-text-secondary text-sm font-medium font-['PingFang_SC']">默认视图</div>
+          <div className="w-4 h-4 relative overflow-hidden flex items-center justify-center text-text-secondary">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0"></path>
+              <path d="M17 12H7"></path>
+              <path d="m9 8-2 4 2 4"></path>
+              <path d="m15 8 2 4-2 4"></path>
+            </svg>
           </div>
         </div>
       </div>

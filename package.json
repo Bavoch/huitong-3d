@@ -11,7 +11,8 @@
     "start": "npm run stop && npm run dev",
     "stop": "node stop-dev.js",
     "preview": "vite preview --port 3000",
-    "status": "lsof -i :3000 || echo '没有进程在3000端口运行'"
+    "status": "lsof -i :3000 || echo '没有进程在3000端口运行'",
+    "verify-config": "node verify-port-config.js"
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.1.2",

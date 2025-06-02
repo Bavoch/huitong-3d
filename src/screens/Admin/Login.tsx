@@ -24,23 +24,23 @@ export const AdminLogin = (): JSX.Element => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50">
-      <Card className="w-full max-w-md bg-white shadow-sm">
+    <div className="flex items-center justify-center min-h-screen bg-app-bg">
+      <Card className="w-full max-w-md bg-container shadow-sm">
         <CardContent className="pt-6">
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-800">会通三维 - 管理员登录</h1>
-            <p className="text-gray-500 mt-1">请输入您的管理员账号和密码</p>
+            <h1 className="text-2xl font-bold text-text-primary">会通智能色彩云库 - 管理员登录</h1>
+            <p className="text-text-secondary mt-1">请输入您的管理员账号和密码</p>
           </div>
-          
+
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded mb-4 text-sm">
+            <div className="bg-destructive/10 border border-destructive text-destructive px-lg py-sm rounded mb-lg text-sm">
               {error}
             </div>
           )}
           
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+          <form onSubmit={handleLogin} className="space-y-lg">
+            <div className="space-y-sm">
+              <label htmlFor="username" className="block text-sm font-medium text-text-secondary">
                 用户名
               </label>
               <Input
@@ -49,13 +49,13 @@ export const AdminLogin = (): JSX.Element => {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="输入用户名"
-                className="border-gray-200"
+                className="bg-input-bg border-border-subtle text-text-primary"
                 required
               />
             </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+
+            <div className="space-y-sm">
+              <label htmlFor="password" className="block text-sm font-medium text-text-secondary">
                 密码
               </label>
               <Input
@@ -64,21 +64,21 @@ export const AdminLogin = (): JSX.Element => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="输入密码"
-                className="border-gray-200"
+                className="bg-input-bg border-border-subtle text-text-primary"
                 required
               />
             </div>
-            
-            <div className="pt-2">
-              <Button 
-                type="submit" 
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium"
+
+            <div className="pt-sm">
+              <Button
+                type="submit"
+                className="w-full btn-primary font-medium"
               >
                 登录
               </Button>
             </div>
-            
-            <div className="text-center text-gray-400 text-sm mt-4">
+
+            <div className="text-center text-text-tertiary text-sm mt-lg">
               <p>默认管理员账号: admin</p>
               <p>默认密码: admin123</p>
             </div>

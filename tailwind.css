@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind components;
 @tailwind utilities;
 
@@ -7,15 +9,39 @@
   }
 }
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
 :root {
+  /* 字体相关变量 */
   --font-family: 'Inter', sans-serif;
-  --font-size: 14px;
+  --font-size-xs: 14px;
+  --font-size-sm: 14px;
+  --font-size-base: 14px;
+  --font-size-lg: 14px;
+  --font-size-xl: 14px;
   --font-style: normal;
-  --font-weight: 500;
+  --font-weight-normal: 400;
+  --font-weight-medium: 400;
+  --font-weight-semibold: 400;
+  --font-weight-bold: 400;
   --letter-spacing: 0px;
   --line-height: normal;
+
+  /* 间距变量 */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-2xl: 24px;
+  --spacing-3xl: 32px;
+
+  /* 圆角变量 */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-full: 9999px;
 }
 
 @tailwind base;
@@ -24,6 +50,7 @@
 
 @layer base {
   :root {
+    /* 基础颜色 */
     --background: 0 0% 100%;
     --foreground: 222.2 47.4% 11.2%;
 
@@ -56,6 +83,24 @@
     --ring: 215 20.2% 65.1%;
 
     --radius: 0.5rem;
+
+    /* 应用特定颜色变量 */
+    --app-bg: 25 25 25; /* #191919 */
+    --container-bg: 255 255 255 / 0.05; /* rgba(255, 255, 255, 0.05) */
+    --container-bg-hover: 255 255 255 / 0.1; /* rgba(255, 255, 255, 0.1) */
+    --container-bg-active: 255 255 255 / 0.15; /* rgba(255, 255, 255, 0.15) */
+
+    --text-primary: 255 255 255; /* rgba(255, 255, 255, 1) */
+    --text-secondary: 255 255 255 / 0.7; /* rgba(255, 255, 255, 0.7) */
+    --text-tertiary: 255 255 255 / 0.4; /* rgba(255, 255, 255, 0.4) */
+    --text-quaternary: 255 255 255 / 0.25; /* rgba(255, 255, 255, 0.25) */
+
+    --input-bg: 0 0 0 / 0.15; /* rgba(0, 0, 0, 0.15) */
+    --border-subtle: 255 255 255 / 0.1; /* rgba(255, 255, 255, 0.1) */
+    --border-emphasis: 34 104 235; /* #2268eb */
+
+    --scrollbar-thumb: 58 58 58; /* #3a3a3a */
+    --tooltip-bg: 37 37 37; /* #252525 */
   }
 
   .dark {
@@ -94,7 +139,7 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-[品牌色] text-white hover:opacity-90 transition-opacity;
+    @apply bg-brand text-text-primary hover:opacity-90 transition-opacity;
   }
   
   /* 通知组件相关样式 */
@@ -133,13 +178,11 @@
   }
 
   body {
-    @apply bg-background text-foreground;
-    @extend .text-foreground;
-    @extend .font-sans;
+    @apply bg-background text-foreground font-sans;
     font-family: var(--font-family);
-    font-size: var(--font-size);
+    font-size: var(--font-size-base);
     font-style: var(--font-style);
-    font-weight: var(--font-weight);
+    font-weight: 400;
     letter-spacing: var(--letter-spacing);
     line-height: var(--line-height);
   }
